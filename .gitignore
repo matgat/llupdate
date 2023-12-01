@@ -1,32 +1,40 @@
-# Prerequisites
-*.d
+# [generic]
+*.log
+**/tmp
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
-
-# Precompiled Headers
+# [c++]
 *.gch
 *.pch
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
+*.o
 *.a
-*.lib
-
-# Executables
+*.obj
 *.exe
-*.out
-*.app
+
+# [qtcreator]
+*.pro.user
+*.stash
+debug/
+release/
+Makefile
+Makefile.Debug
+Makefile.Release
+
+# [msvc]
+.vs/
+*.exe.recipe
+*.iobj
+*.tlog
+*.ipch
+*.idb
+*.pdb
+*.ilk
+*.suo
+*.VC.db
+*.db-*
+*.opendb
+*.filters
+*.user
+
+# [specific]
+linux/build
+test/
