@@ -21,7 +21,7 @@ namespace ll
 
 //---------------------------------------------------------------------------
 enum class project_type : std::uint8_t { ppjs, plcprj };
-void recognize_project_type( const fs::path& prj_pth )
+[[nodiscard]] project_type recognize_project_type( const fs::path& prj_pth )
 {
     // The comparison should be case insensitive?
     const std::string ext{ prj_pth.extension().string() };
@@ -37,13 +37,28 @@ void recognize_project_type( const fs::path& prj_pth )
 }
 
 
+   template<text::enc_t enc> void parse(const std::string_view buf)
+       {
+        text::buffer_t<enc> text_buf(buf);
+        while( text_buf.has_codepoint() )
+           {
+            const char32_t codepoint = text_buf.extract_next_codepoint();
+            // ...
+           }
+        // Detect truncated
+        if( text_buf.has_bytes() )
+           {
+            // Truncated codepoint!
+           }
+       }
+
 //---------------------------------------------------------------------------
 void update_project( const fs::path& prj_pth, fs::path out_pth, std::vector<std::string>& issues )
 {
    const project_type prj_type = recognize_project_type(prj_pth);
    const sys::memory_mapped_file mem_mapped_file{prj_pth.string()};
-   const std::string_view orig_buf{mem_mapped_file.as_string_view()};
-   const auto [enc, bom_size] = text::detect_encoding_of(orig_buf);
+   const std::string_view buf{mem_mapped_file.as_string_view()};
+   const auto [enc, bom_size] = text::detect_encoding_of(buf);
 
    switch( prj_type )
        {using enum project_type;
@@ -55,28 +70,7 @@ void update_project( const fs::path& prj_pth, fs::path out_pth, std::vector<std:
             break;
        }
 
-   template<text::enc_t enc> void parse(const std::string_view &buf)
-       {
-        for(std::size_t pos = 0; pos < orig_buf.size(); )
-           {
-            const char32_t codepoint = text::extract_next_codepoint<enc>(orig_buf, pos);
-           }
-           
-        text::buffer_t<enc> text_buf;
-        while( text_buf.has_codepoint() )
-           {
-            const char32_t codepoint = text_buf.extract_next_codepoint();
-            // ...
-           }
-        // Detect truncated
-        if( text_buf.has_bytes() )
-           {
-            // Truncated codepoint!
-           }
-           
-       }
-
-    switch( buf_enc )
+    switch( enc )
        {using enum text::enc_t;
 
         case UTF8:
@@ -105,6 +99,8 @@ void update_project( const fs::path& prj_pth, fs::path out_pth, std::vector<std:
     //   {
     //   }
 }
+
+}//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 
 //---- end unit -------------------------------------------------------------

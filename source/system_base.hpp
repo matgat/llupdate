@@ -10,6 +10,7 @@
 
 #if defined(MS_WINDOWS)
   #include <Windows.h>
+  #include <shellapi.h> // ShellExecuteExA, FindExecutableA
 #elif defined(POSIX)
   #include <unistd.h> // unlink, exec*, fork, ...
 #endif
@@ -44,7 +45,15 @@ namespace sys //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
                          nullptr );
 
     return siz>0 ? std::string(buf, siz)
-                 : std::string("Unknown error ") + std::to_string(i);
+                 : std::string("Unknown error ") + std::to_string(e);
+}
+
+//---------------------------------------------------------------------------
+[[nodiscard]] std::string find_executable_by_file(const std::string& doc) noexcept
+{
+    char buf[MAX_PATH + 1] = {'\0'};
+    ::FindExecutableA(doc.c_str(), NULL, buf);
+    return std::string(buf);
 }
 
 //---------------------------------------------------------------------------
@@ -60,7 +69,7 @@ void shell_execute(const char* const pth, const char* const args =nullptr) noexc
     ShExecInfo.lpDirectory = NULL;
     ShExecInfo.nShow = SW_SHOW;
     ShExecInfo.hInstApp = NULL;
-    ::ShellExecuteEx(&ShExecInfo);
+    ::ShellExecuteExA(&ShExecInfo);
 }
 
 #endif

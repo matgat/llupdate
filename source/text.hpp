@@ -5,7 +5,6 @@
 //  ---------------------------------------------
 #include <cstdint> // std::uint8_t
 #include <cassert>
-#include <tuple>
 #include <string_view>
 //#include <cuchar> // mbrtoc32, ...
 
@@ -30,7 +29,8 @@ const char32_t null_char = 0;
 
 //---------------------------------------------------------------------------
 // auto [enc, bom_size] = text::detect_encoding_of(buf);
-std::tuple<enc_t, std::uint8_t> detect_encoding_of(const std::string_view buf)
+struct bom_ret_t final { enc_t enc; std::uint8_t bom_size; };
+bom_ret_t detect_encoding_of(const std::string_view buf)
    {//      +--------------+-------------+-------+
     //      |  Encoding    |   Bytes     | Chars |
     //      |--------------|-------------|-------|
@@ -77,12 +77,12 @@ std::tuple<enc_t, std::uint8_t> detect_encoding_of(const std::string_view buf)
 template<enc_t enc> char32_t extract_next_codepoint(const char* const buf, const std::size_t siz, std::size_t& pos) noexcept;
 
 //---------------------------------------------------------------------------
-template<> char32_t extract_next_codepoint<enc_t::ANSI>(const char* const buf, const std::size_t siz, std::size_t& pos) noexcept
-{
-    assert(pos<siz);
-
-    return buf[pos++];
-}
+//template<> char32_t extract_next_codepoint<enc_t::ANSI>(const char* const buf, const std::size_t siz, std::size_t& pos) noexcept
+//{
+//    assert(pos<siz);
+//
+//    return buf[pos++];
+//}
 
 //---------------------------------------------------------------------------
 template<> char32_t extract_next_codepoint<enc_t::UTF8>(const char* const buf, const std::size_t siz, std::size_t& pos) noexcept
@@ -95,21 +95,21 @@ template<> char32_t extract_next_codepoint<enc_t::UTF8>(const char* const buf, c
         return buf[pos];
        }
 
-    else if( (pos+1)<siz) && (buf[pos] & 0xE0)==0xC0 && (buf[pos+1] & 0xC0)==0x80 )
+    else if( (pos+1)<siz && (buf[pos] & 0xE0)==0xC0 && (buf[pos+1] & 0xC0)==0x80 )
        {
         const char32_t codepoint = ((buf[pos] & 0x1F) << 6) | (buf[pos+1] & 0x3F);
         pos += 2;
         return codepoint;
        }
 
-    else if( (pos+2)<siz) && (buf[pos] & 0xF0)==0xE0 && (buf[pos+1] & 0xC0)==0x80 && (buf[pos+2] & 0xC0)==0x80 )
+    else if( (pos+2)<siz && (buf[pos] & 0xF0)==0xE0 && (buf[pos+1] & 0xC0)==0x80 && (buf[pos+2] & 0xC0)==0x80 )
        {
         const char32_t codepoint = ((buf[pos] & 0x0F) << 12) | ((buf[pos+1] & 0x3F) << 6) | (buf[pos+2] & 0x3F);
         pos += 3;
         return codepoint;
        }
 
-    else if( (pos+3)<siz) && (buf[pos] & 0xF8)==0xF0 && (buf[pos+1] & 0xC0)==0x80 && (buf[pos+2] & 0xC0)==0x80 && (buf[pos+3] & 0xC0)==0x80 )
+    else if( (pos+3)<siz && (buf[pos] & 0xF8)==0xF0 && (buf[pos+1] & 0xC0)==0x80 && (buf[pos+2] & 0xC0)==0x80 && (buf[pos+3] & 0xC0)==0x80 )
        {
         const char32_t codepoint = ((buf[pos] & 0x07) << 18) | ((buf[pos+1] & 0x3F) << 12) | ((buf[pos+2] & 0x3F) << 6) | (buf[pos+3] & 0x3F);
         pos += 4;
@@ -166,11 +166,11 @@ template<bool LE> char32_t extract_next_codepoint_from_utf16(const char* const b
 }
 template<> char32_t extract_next_codepoint<enc_t::UTF16LE>(const char* const buf, const std::size_t siz, std::size_t& pos) noexcept
 {
-    return extract_next_codepoint_from_utf16<true>;
+    return extract_next_codepoint_from_utf16<true>(buf, siz, pos);
 }
 template<> char32_t extract_next_codepoint<enc_t::UTF16BE>(const char* const buf, const std::size_t siz, std::size_t& pos) noexcept
 {
-    return extract_next_codepoint_from_utf16<false>;
+    return extract_next_codepoint_from_utf16<false>(buf, siz, pos);
 }
 
 //---------------------------------------------------------------------------
@@ -264,12 +264,12 @@ template<enc_t ENC> class buffer_t final
        {
        }
 
-    [[no_discard]] bool has_bytes() const noexcept
+    [[nodiscard]] bool has_bytes() const noexcept
        {
         return m_byte_pos<m_byte_size;
        }
 
-    [[no_discard]] bool has_codepoint() const noexcept
+    [[nodiscard]] bool has_codepoint() const noexcept
        {
         if constexpr(ENC==enc_t::UTF16LE || ENC==enc_t::UTF16BE)
            {
@@ -285,17 +285,32 @@ template<enc_t ENC> class buffer_t final
            }
        }
 
-    [[no_discard]] char32_t extract_next_codepoint()
+    [[nodiscard]] char32_t extract_next_codepoint()
        {
         assert( has_codepoint() );
-        return extract_next_codepoint<ENC>(m_byte_data, m_byte_size, m_byte_pos);
+        return text::extract_next_codepoint<ENC>(m_byte_data, m_byte_size, m_byte_pos);
        }
 
-    [[no_discard]] const char* byte_data() const noexcept { return m_byte_data; }
-    [[no_discard]] std::size_t byte_size() const noexcept { return m_byte_size; }
-    [[no_discard]] std::size_t byte_pos() const noexcept { return m_byte_pos; }
+    [[nodiscard]] const char* byte_data() const noexcept { return m_byte_data; }
+    [[nodiscard]] std::size_t byte_size() const noexcept { return m_byte_size; }
+    [[nodiscard]] std::size_t byte_pos() const noexcept { return m_byte_pos; }
 };
 
+//---------------------------------------------------------------------------
+//template<text::enc_t enc> void convert(const std::string_view buf)
+//{
+//    text::buffer_t<enc> text_buf(buf);
+//    while( text_buf.has_codepoint() )
+//       {
+//        const char32_t codepoint = text_buf.extract_next_codepoint();
+//        // ...
+//       }
+//    // Detect truncated
+//    if( text_buf.has_bytes() )
+//       {
+//        // Truncated codepoint!
+//       }
+//}
 
 
 //---------------------------------------------------------------------------
