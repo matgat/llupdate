@@ -1,25 +1,21 @@
 PRJNAME = llupdate
 SRCDIR = ../source
 BLDDIR = ./build
+TARGET = $(BLDDIR)/$(PRJNAME)
 VPATH := $(SRCDIR)
 MAIN = $(SRCDIR)/main.cpp
 HEADERS = $(wildcard $(SRCDIR)/*.hpp)
-#OBJS := $(HEADERS:.hpp=.o)
-#OBJS := $(SRCS:%.cpp=BLDDIR/%.o)
 
 CXX = g++
-CXXFLAGS = -std=c++2b -funsigned-char -Wall -Wextra -Wpedantic -Wconversion -Wfatal-errors -O3 -lfmt
-#CXX = cl.exe
-#CXXFLAGS = /std:c++latest /utf-8 /J /W4 /O2
+CXXFLAGS = -std=c++2b -Wall -Wextra -Wpedantic -Wconversion -Wfatal-errors -O3 -lfmt
+#MSVCFLAGS = /std:c++latest /utf-8 /W4 /O2
 
-ifeq ($(OS),Windows_NT)
-	TARGET = $(BLDDIR)/$(PRJNAME).exe
-else
-	TARGET = $(BLDDIR)/$(PRJNAME)
-endif
+TEST_DIR = ../test
+TEST_MAIN = $(TEST_DIR)/test.cpp
+TEST_TARGET = $(TEST_DIR)/build/$(PRJNAME)_test
+TEST_FLAGS = -DTESTING -pthread -lgtest -lgtest_main
 
-
-all: executable
+all: executable test
 
 debug: CXXFLAGS += -DDEBUG -D_DEBUG -g
 debug: executable
@@ -27,12 +23,8 @@ debug: executable
 executable: $(MAIN) $(HEADERS) makefile
 	$(CXX) -o $(TARGET) $(CXXFLAGS) $(MAIN)
 
-#my_program: $(OBJECTS)
-#	$(CXX) $(OBJECTS) -o my_program
-#
-#processing.o: processing.cxx
-#	$(CXX) $(INCLUDES) $(CXXFLAGS) -c processing.cxx -o processing.o
-
+test: $(TEST_MAIN) $(MAIN) $(HEADERS) makefile
+	$(CXX) -o $(TEST_TARGET) $(CXXFLAGS) $(TEST_FLAGS) $(TEST_MAIN)
 
 clean:
 	rm *.o

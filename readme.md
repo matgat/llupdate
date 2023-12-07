@@ -30,6 +30,7 @@ To update a project without overwriting the original file:
 ```bat
 > llupdate "C:\path\to\project.ppjs" --out "C:\path\to\project-updated.ppjs"
 ```
+
 Note that the output file will be overwritten without any warning.
 
 | Return value | Meaning                                |
@@ -60,7 +61,7 @@ Testing:
 
 ```sh
 # pacman -S gtest
-$ g++ -std=c++2b -Wall -Wextra -Wpedantic -Wconversion -O3 -lfmt -pthread -lgtest -lgtest_main -o "test/llupdate_test" "test/test.cpp"
+$ g++ -std=c++2b -Wall -Wextra -Wpedantic -Wconversion -O3 -DTESTING -lfmt -pthread -lgtest -lgtest_main -o "test/llupdate_test" "test/test.cpp"
 $ ./test/llupdate_test
 ```
 
@@ -78,4 +79,11 @@ This project depends on `{fmt}` library, use `vcpkg` to install it:
 > .\vcpkg\bootstrap-vcpkg.bat -disableMetrics
 > .\vcpkg\vcpkg integrate install
 > .\vcpkg\vcpkg install fmt:x64-windows
+```
+
+in case you already have `vcpkg`:
+
+```bat
+> .\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+> .\vcpkg\vcpkg upgrade --no-dry-run
 ```

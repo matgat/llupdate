@@ -37,20 +37,21 @@ enum class project_type : std::uint8_t { ppjs, plcprj };
 }
 
 
-   template<text::enc_t enc> void parse(const std::string_view buf)
-       {
-        text::buffer_t<enc> text_buf(buf);
-        while( text_buf.has_codepoint() )
-           {
-            const char32_t codepoint = text_buf.extract_next_codepoint();
-            // ...
-           }
-        // Detect truncated
-        if( text_buf.has_bytes() )
-           {
-            // Truncated codepoint!
-           }
-       }
+//---------------------------------------------------------------------------
+//template<text::enc_t enc> void parse(const std::string_view buf)
+//   {
+//    text::buffer_t<enc> text_buf(buf);
+//    while( text_buf.has_codepoint() )
+//       {
+//        const char32_t codepoint = text_buf.extract_next_codepoint();
+//        // ...
+//       }
+//    // Detect truncated
+//    if( text_buf.has_bytes() )
+//       {
+//        // Truncated codepoint!
+//       }
+//   }
 
 //---------------------------------------------------------------------------
 void update_project( const fs::path& prj_pth, fs::path out_pth, std::vector<std::string>& issues )
@@ -72,25 +73,25 @@ void update_project( const fs::path& prj_pth, fs::path out_pth, std::vector<std:
 
     switch( enc )
        {using enum text::enc_t;
-
+    
         case UTF8:
-            parse<UTF8>(buf);
+            //parse<UTF8>(buf);
             break;
-
+    
         case UTF16LE:
-            parse<UTF16LE>(buf);
+            //parse<UTF16LE>(buf);
             break;
-
+    
         case UTF16BE:
-            parse<UTF16BE>(buf);
+            //parse<UTF16BE>(buf);
             break;
-
+    
         case UTF32LE:
-            parse<UTF32LE>(buf);
+            //parse<UTF32LE>(buf);
             break;
-
+    
         case UTF32BE:
-            parse<UTF32BE>(buf);
+            //parse<UTF32BE>(buf);
             break;
        }
 
