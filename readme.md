@@ -60,8 +60,7 @@ $ g++ -std=c++2b -Wall -Wextra -Wpedantic -Wconversion -O3 -lfmt -o "llupdate" "
 Testing:
 
 ```sh
-# pacman -S gtest
-$ g++ -std=c++2b -Wall -Wextra -Wpedantic -Wconversion -O3 -DTESTING -lfmt -pthread -lgtest -lgtest_main -o "test/llupdate_test" "test/test.cpp"
+$ g++ -std=c++2b -Wall -Wextra -Wpedantic -Wconversion -DTESTING -O3 -lfmt -o "test/llupdate_test" "test/test.cpp"
 $ ./test/llupdate_test
 ```
 

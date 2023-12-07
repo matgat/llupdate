@@ -5,7 +5,7 @@ VisualStudioVersion = 17.8.34322.80
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "llupdate", "llupdate.vcxproj", "{CC711354-0868-4333-99E7-D20DEF74BA83}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "llupdate-gtest", "llupdate-gtest.vcxproj", "{7BA16095-D2A4-4EAE-8479-C63CBC4EE7E0}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "llupdate-test", "llupdate-test.vcxproj", "{7BA16095-D2A4-4EAE-8479-C63CBC4EE7E0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
