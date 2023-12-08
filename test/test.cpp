@@ -1,14 +1,37 @@
+#include <array>
+
 #define BOOST_UT_DISABLE_MODULE
 #include "ut.hpp" // import boost.ut;
+namespace tst = boost::ut;
 
+#define TEST_UNITS // Include units embedded tests
 #include "../source/text.hpp" // text::buffer_t
+
+// Custom reporter
+//#include <iostream>
+//namespace ft {
+//template <class TReporter>
+//struct runner : tst::runner<TReporter> {
+//  template <class... Ts>
+//  auto on(tst::events::test<Ts...> test) {
+//    std::cout << test.name << '\n';
+//    tst::runner<TReporter>::on(test);
+//  }
+//
+//  using tst::runner<TReporter>::on;
+//};
+//}  // namespace ft
+//
+//template <class... Ts>
+//inline auto tst::cfg<tst::override, Ts...> = ft::runner<tst::reporter<>>{};
+
 
 
 /////////////////////////////////////////////////////////////////////////////
-#ifdef TESTING //////////////////////////////////////////////////////////////
-boost::ut::suite text_test_suite = []
+#ifdef TEST_UNITS ///////////////////////////////////////////////////////////
+static tst::suite<"text tests"> text_tests = []
 { ///////////////////////////////////////////////////////////////////////////
-    using namespace boost::ut;
+    using namespace tst;
     using namespace std::literals; // "..."sv
 
     test("detect_encoding_of") = []
@@ -40,67 +63,104 @@ boost::ut::suite text_test_suite = []
         test_enc_of("\0\xFE\xFF blah"sv, {UTF8,0}, "Invalid utf-32-be BOM should fall back to utf-8\n");
        };
 
-    test("extract_codepoint") = []
+    test("codepoints decode and encode") = []
        {
+        static_assert( U'🍌'==0x1F34C );
+
+        struct test_case_t final
+           {
+            const char32_t code_point;
+            const std::string_view UTF8_encoded;
+            const std::string_view UTF16LE_encoded;
+            const std::string_view UTF16BE_encoded;
+            const std::string_view UTF32LE_encoded;
+            const std::string_view UTF32BE_encoded;
+           };
+        constexpr std::array<test_case_t,4> test_cases =
+           {{
+             { U'a', "\x61"sv, "\x61\0"sv, "\0\x61"sv, "\x61\0\0\0"sv, "\0\0\0\x61"sv }
+            ,{ U'à', "\xC3\xA0"sv, "\xE0\0"sv, "\0\xE0"sv, "\xE0\0\0\0"sv, "\0\0\0\xE0"sv }
+            ,{ U'⟶', "\xE2\x9F\xB6"sv, "\xF6\x27"sv, "\x27\xF6"sv, "\xF6\x27\0\0"sv, "\0\0\x27\xF6"sv }
+            ,{ U'🍌', "\xF0\x9F\x8D\x8C"sv, "\x3C\xD8\x4C\xDF"sv, "\xD8\x3C\xDF\x4C"sv, "\x4C\xF3\x01\0"sv, "\0\x01\xF3\x4C"sv }
+           }};
+
+      #define TEST_ENC(ENC) \
+           { \
+            log << "Testing " << test_case.UTF8_encoded << " with " #ENC; \
+            std::size_t pos{}; \
+            expect( text::extract_codepoint<ENC>(test_case.ENC##_encoded, pos) == test_case.code_point ); \
+            std::string bytes; \
+            text::append_codepoint<ENC>(test_case.code_point, bytes); \
+            expect( test_case.ENC##_encoded == bytes ); \
+            if( test_case.ENC##_encoded!=bytes ) \
+               { \
+                log << #ENC " failed "; \
+                log << "original: "; \
+                for(const char ch : test_case.ENC##_encoded) \
+                    { \
+                     log << "0x" << std::hex << static_cast<unsigned short>(ch) << ' '; \
+                    } \
+                log << "encoded: "; \
+                for(const char ch : bytes) \
+                    { \
+                     log << "0x" << std::hex << static_cast<unsigned short>(ch) << ' '; \
+                    } \
+               } \
+           }
+
         using enum text::enc_t;
-
-        std::size_t pos{};
-        pos=0; expect( text::extract_codepoint<UTF8>("\x61"sv, pos) == U'a' );
-        pos=0; expect( text::extract_codepoint<UTF8>("\xC3\xA0"sv, pos) == U'à' );
-        pos=0; expect( text::extract_codepoint<UTF8>("\xC3\xA0"sv, pos)==U'à' );
-        pos=0; expect( text::extract_codepoint<UTF8>("\xE2\x9F\xB6"sv, pos)==U'⟶' );
-        pos=0; expect( text::extract_codepoint<UTF8>("\xF0\x9F\x8D\x8C"sv, pos)==U'🍌' );
-
-        pos=0; expect( text::extract_codepoint<UTF16LE>("\x61\0"sv, pos)==U'a' );
-        pos=0; expect( text::extract_codepoint<UTF16LE>("\xE0\0"sv, pos)==U'à' );
-        pos=0; expect( text::extract_codepoint<UTF16LE>("\xF6\x27"sv, pos)==U'⟶' );
-        pos=0; expect( text::extract_codepoint<UTF16LE>("\x3C\xD8\x4C\xDF"sv, pos)==U'🍌' );
-        //pos=0; expect( text::extract_codepoint<UTF16LE>("\x7E\x23"sv, pos)==U'⍾' );
-        //pos=0; expect( text::extract_codepoint<UTF16LE>("\x34\xD8\x1E\xDD"sv, pos)==U'𝄞' );
-
-        pos=0; expect( text::extract_codepoint<UTF16BE>("\0\x61"sv, pos)==U'a' );
-        pos=0; expect( text::extract_codepoint<UTF16BE>("\0\xE0"sv, pos)==U'à' );
-        pos=0; expect( text::extract_codepoint<UTF16BE>("\x27\xF6"sv, pos)==U'⟶' );
-        pos=0; expect( text::extract_codepoint<UTF16BE>("\xD8\x3C\xDF\x4C"sv, pos)==U'🍌' );
-
-        pos=0; expect( text::extract_codepoint<UTF32LE>("\x61\0\0\0"sv, pos)==U'a' );
-        pos=0; expect( text::extract_codepoint<UTF32LE>("\xE0\0\0\0"sv, pos)==U'à' );
-        pos=0; expect( text::extract_codepoint<UTF32LE>("\xF6\x27\0\0"sv, pos)==U'⟶' );
-        pos=0; expect( text::extract_codepoint<UTF32LE>("\x4C\xF3\x01\0"sv, pos)==U'🍌' );
-
-        pos=0; expect( text::extract_codepoint<UTF32BE>("\0\0\0\x61"sv, pos)==U'a' );
-        pos=0; expect( text::extract_codepoint<UTF32BE>("\0\0\0\xE0"sv, pos)==U'à' );
-        pos=0; expect( text::extract_codepoint<UTF32BE>("\0\0\x27\xF6"sv, pos)==U'⟶' );
-        pos=0; expect( text::extract_codepoint<UTF32BE>("\0\x01\xF3\x4C"sv, pos)==U'🍌' );
+        for(const auto& test_case : test_cases)
+           {
+            test(test_case.UTF8_encoded) = [&test_case]
+               {
+                TEST_ENC(UTF8)
+                TEST_ENC(UTF16LE)
+                TEST_ENC(UTF16BE)
+                TEST_ENC(UTF32LE)
+                TEST_ENC(UTF32BE)
+               };
+           }
+      #undef TEST_ENC
        };
 
-    test("append_codepoint") = []
-       {
-        using enum text::enc_t;
-        //text::write_codepoint<UTF8>(U'🍌', const std::string bytes, std::size_t& pos);
-       };
+    //test("xxx") = []
+    //   {
+    //    using enum text::enc_t;
+    //   };
 
 };///////////////////////////////////////////////////////////////////////////
 #endif // TESTING ///////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
 
     //using namespace boost::ut;
-    //expect(1_i == 2);       // UDL syntax
-    //expect(1 == 2_i);       // UDL syntax
+
+    //skip / "skipped test"_test = [] { };
+
+    //expect(1_i == 2);
+    //expect( fatal(1 == 2_i) );
     //expect(that % 1 == 2);  // Matcher syntax
     //expect(eq(1, 2));       // eq/neq/gt/ge/lt/le
 
     //expect((1 == 2_i) >> fatal); // fatal assertion
     //expect(42l == 42_l and 1 == 2_i) << "additional info";
 
+    //"lazy log"_test = [] {
+    //  std::expected<bool, std::string> e = std::unexpected("lazy evaluated");
+    //  expect(e.has_value()) << [&] { return e.error(); } << fatal;
+    //  expect(e.value() == true);
+    //};
+
+
     //"hello world"_test = [] { ... };
     //test("hello world") = [] { ... };
 
     //"logging"_test = [] {
-    //  log << "pre";
+    //  log << "pre " << 42;
     //  expect(42_i == 43) << "message on failure";
-    //  log << "post";
+    //  log << "post " << 43;
     //};
+
+    // expect(type<int> == type<int>);
 
     //for (const auto& i : std::vector{1, 2, 3}) {
     //  test("parameterized " + std::to_string(i)) = [i] { // 3 tests
@@ -120,9 +180,9 @@ boost::ut::suite text_test_suite = []
     //};
 
     // "exception/aborts"_test = [] {
-    //   expect(throws<std::runtime_error>([] { throw std::runtime_error{""}; })) << "throws runtime_error";
-    //   expect(throws([] { throw 0; })) << "throws any exception";
-    //   expect(nothrow([]{})) << "doesn't throw";
+    //   expect(throws<std::runtime_error>([] { throw std::runtime_error{""}; })) << "should throw runtime_error";
+    //   expect(throws([] { throw 0; })) << "should throw any exception";
+    //   expect(nothrow([]{})) << "should't throw";
     //   expect(aborts([] { assert(false); }));
     // };
 
@@ -149,6 +209,7 @@ boost::ut::suite text_test_suite = []
 
     //test("vector") = []
     //   {
+    //    using namespace boost::ut::bdd;
     //    given("I have a vector") = []
     //       {
     //        std::vector<int> v(5);
@@ -257,3 +318,35 @@ int main()
 {
     //return boost::ut::run({.report_errors = true});
 }
+
+// cli
+//int main(int argc, const char** argv)
+//{
+//  using namespace boost::ut;
+//
+//  cfg<override> = {.filter = argc > 1 ? argv[1] : "",
+//                   .colors = argc > 2 and argv[2][0] == '0'
+//                                 ? colors{.none = "", .pass = "", .fail = ""}
+//                                 : colors{},
+//                   .dry_run = argc > 3 ? argv[3][0] == '1' : false};
+//
+//  "cli"_test = [] {
+//    "pass"_test = [] { expect(42 == 42_i); };
+//    "fail"_test = [] { expect(0 == 42_i); };
+//  };
+//}
+
+//filtering tests
+//int main()
+//{
+//  using namespace boost::ut;
+//
+//  cfg<override> = {.filter = "run.sub1"};
+//
+//  "run"_test = [] {
+//    "sub1"_test = [] { expect(42 == 42_i); };
+//    "sub2"_test = [] { expect(43 == 42_i); };
+//  };
+//
+//  "don't run"_test = [] { expect(0 == 1_i) << "don't run"; };
+//}

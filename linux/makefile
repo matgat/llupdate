@@ -10,10 +10,8 @@ CXX = g++
 CXXFLAGS = -std=c++2b -Wall -Wextra -Wpedantic -Wconversion -Wfatal-errors -O3 -lfmt
 #MSVCFLAGS = /std:c++latest /utf-8 /W4 /O2
 
-TEST_DIR = ../test
-TEST_MAIN = $(TEST_DIR)/test.cpp
-TEST_TARGET = $(TEST_DIR)/build/$(PRJNAME)_test
-TEST_FLAGS = -DTESTING -pthread -lgtest -lgtest_main
+TEST_MAIN = ../test/test.cpp
+TEST_TARGET = $(BLDDIR)/$(PRJNAME)-test
 
 all: executable test
 
@@ -24,7 +22,7 @@ executable: $(MAIN) $(HEADERS) makefile
 	$(CXX) -o $(TARGET) $(CXXFLAGS) $(MAIN)
 
 test: $(TEST_MAIN) $(MAIN) $(HEADERS) makefile
-	$(CXX) -o $(TEST_TARGET) $(CXXFLAGS) $(TEST_FLAGS) $(TEST_MAIN)
+	$(CXX) -o $(TEST_TARGET) $(CXXFLAGS) $(TEST_MAIN)
 
 clean:
 	rm *.o
