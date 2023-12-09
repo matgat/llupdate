@@ -28,12 +28,12 @@ long_line_behaviour=1
 long_line_column=72
 
 [files]
-current_page=0
-FILE_NAME_0=5051;C++;0;EUTF-8;0;1;0;%2Fhome%2Fmat%2Fdev%2Fllupdate%2Ftest%2Ftest.cpp;0;4
-FILE_NAME_1=12940;C++;0;EUTF-8;0;1;0;%2Fhome%2Fmat%2Fdev%2Fllupdate%2Fsource%2Ftext.hpp;0;4
+current_page=1
+FILE_NAME_0=8255;C++;0;EUTF-8;0;1;0;%2Fhome%2Fmat%2Fdev%2Fllupdate%2Ftest%2Ftest.cpp;0;4
+FILE_NAME_1=2602;C++;0;EUTF-8;0;1;0;%2Fhome%2Fmat%2Fdev%2Fllupdate%2Fsource%2Ftext.hpp;0;4
 
 [VTE]
-last_dir=/home/mat/dev/llupdate/test
+last_dir=/home/mat/dev/llupdate/source
 
 [build-menu]
 filetypes=C++;
@@ -56,13 +56,13 @@ C++FT_00_LB=_Compile
 C++FT_00_CM=g++ -std=c++2b -fsyntax-only -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wfatal-errors -c "%f"
 C++FT_00_WD=%d
 C++FT_01_LB=_Lint
-C++FT_01_CM=acppcheck --language=c++ --enable=warning,style --inline-suppr --suppress=passedByValue --template=gcc "%f"
+C++FT_01_CM=cppcheck --language=c++ --enable=warning,style --inline-suppr --suppress=passedByValue --template=gcc "%f"
 C++FT_01_WD=%d
 C++FT_02_LB=clang-tidy
 C++FT_02_CM=clang-tidy --header-filter=\\.hpp$ "%f" -- -std=c++2b
 C++FT_02_WD=%d
 C++FT_03_LB=_Analyze
-C++FT_03_CM=acppcheck --language=c++ --enable=warning,style --template=gcc "%f"
+C++FT_03_CM=g++ -fanalyzer -std=c++2b -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wfatal-errors -O3 -flto=auto -lfmt -o "linux/build/llupdate" "source/main.cpp"
 C++FT_03_WD=%d
 C++FT_04_LB=_Build
 C++FT_04_CM=g++ -std=c++2b -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wfatal-errors -O3 -flto=auto -lfmt -o "linux/build/llupdate" "source/main.cpp"

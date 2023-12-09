@@ -58,8 +58,8 @@ void update_project( const fs::path& prj_pth, fs::path out_pth, std::vector<std:
 {
    const project_type prj_type = recognize_project_type(prj_pth);
    const sys::memory_mapped_file mem_mapped_file{prj_pth.string()};
-   const std::string_view buf{mem_mapped_file.as_string_view()};
-   const auto [enc, bom_size] = text::detect_encoding_of(buf);
+   const std::string_view bytes{mem_mapped_file.as_string_view()};
+   const auto [enc, bom_size] = text::detect_encoding_of(bytes);
 
    switch( prj_type )
        {using enum project_type;
@@ -73,23 +73,23 @@ void update_project( const fs::path& prj_pth, fs::path out_pth, std::vector<std:
 
     switch( enc )
        {using enum text::enc_t;
-    
+
         case UTF8:
             //parse<UTF8>(buf);
             break;
-    
+
         case UTF16LE:
             //parse<UTF16LE>(buf);
             break;
-    
+
         case UTF16BE:
             //parse<UTF16BE>(buf);
             break;
-    
+
         case UTF32LE:
             //parse<UTF32LE>(buf);
             break;
-    
+
         case UTF32BE:
             //parse<UTF32BE>(buf);
             break;

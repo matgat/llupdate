@@ -29,10 +29,19 @@ namespace tst = boost::ut;
 
 /////////////////////////////////////////////////////////////////////////////
 #ifdef TEST_UNITS ///////////////////////////////////////////////////////////
-static tst::suite<"text tests"> text_tests = []
+static tst::suite<"text:: "> text_tests = []
 { ///////////////////////////////////////////////////////////////////////////
     using namespace tst;
     using namespace std::literals; // "..."sv
+    using enum text::enc_t;
+
+    auto log_str = [](const std::string_view sv)
+       {
+        for(const char ch : sv)
+            {
+             log << "0x" << std::hex << (static_cast<unsigned short>(ch) & 0xFF) << ' '; \
+            }
+       };
 
     test("detect_encoding_of") = []
        {
@@ -41,8 +50,6 @@ static tst::suite<"text tests"> text_tests = []
             const text::bom_ret_t retrieved = text::detect_encoding_of(bytes);
             expect( retrieved.enc==expected.enc and retrieved.bom_size==expected.bom_size ) << msg;
            };
-
-        using enum text::enc_t;
 
         test_enc_of("\xEF\xBB\xBF blah"sv, {UTF8,3}, "Full utf-8 BOM should be detected\n");
         test_enc_of("blah blah"sv, {UTF8,0}, "No BOM found should imply utf-8\n");
@@ -63,7 +70,7 @@ static tst::suite<"text tests"> text_tests = []
         test_enc_of("\0\xFE\xFF blah"sv, {UTF8,0}, "Invalid utf-32-be BOM should fall back to utf-8\n");
        };
 
-    test("codepoints decode and encode") = []
+    test("codepoints decode and encode") = [&log_str]
        {
         static_assert( U'🍌'==0x1F34C );
 
@@ -86,32 +93,25 @@ static tst::suite<"text tests"> text_tests = []
 
       #define TEST_ENC(ENC) \
            { \
-            log << "Testing " << test_case.UTF8_encoded << " with " #ENC; \
+            /*log << "Testing " << test_case.UTF8_encoded << " with " #ENC;*/ \
             std::size_t pos{}; \
             expect( text::extract_codepoint<ENC>(test_case.ENC##_encoded, pos) == test_case.code_point ); \
             std::string bytes; \
             text::append_codepoint<ENC>(test_case.code_point, bytes); \
             expect( test_case.ENC##_encoded == bytes ); \
-            if( test_case.ENC##_encoded!=bytes ) \
+            if( test_case.ENC##_encoded != bytes ) \
                { \
                 log << #ENC " failed "; \
                 log << "original: "; \
-                for(const char ch : test_case.ENC##_encoded) \
-                    { \
-                     log << "0x" << std::hex << static_cast<unsigned short>(ch) << ' '; \
-                    } \
+                log_str(test_case.ENC##_encoded); \
                 log << "encoded: "; \
-                for(const char ch : bytes) \
-                    { \
-                     log << "0x" << std::hex << static_cast<unsigned short>(ch) << ' '; \
-                    } \
+                log_str(bytes); \
                } \
            }
 
-        using enum text::enc_t;
         for(const auto& test_case : test_cases)
            {
-            test(test_case.UTF8_encoded) = [&test_case]
+            test(test_case.UTF8_encoded) = [&test_case, &log_str]
                {
                 TEST_ENC(UTF8)
                 TEST_ENC(UTF16LE)
@@ -123,10 +123,79 @@ static tst::suite<"text tests"> text_tests = []
       #undef TEST_ENC
        };
 
-    //test("xxx") = []
+    //test("text::buffer_t") = []
     //   {
-    //    using enum text::enc_t;
+    //    //
     //   };
+
+    test("text::encode_as") = [&log_str]
+       {
+        expect( text::encode_as<UTF8>(""sv) == ""sv) << "Implicit utf-8 empty string should be empty\n";
+
+        //log_str( " ab"sv );
+        const std::string_view ex1_utf8 = "\xEF\xBB\xBF ab"sv;
+        const std::string_view ex1_utf16le = "\xFF\xFE\x20\x00\x61\x00\x62\x00"sv;
+        const std::string_view ex1_utf16be = "\xFE\xFF\x00\x20\x00\x61\x00\x62"sv;
+        const std::string_view ex1_utf32le = "\xFF\xFE\x00\x00\x20\x00\x00\x00\x61\x00\x00\x00\x62\x00\x00\x00"sv;
+        const std::string_view ex1_utf32be = "\x00\x00\xFE\xFF\x00\x00\x00\x20\x00\x00\x00\x61\x00\x00\x00\x62"sv;
+        expect( text::encode_as<UTF8>(ex1_utf8)==ex1_utf8) << "(ex1) utf-8 to utf-8\n";
+        expect( text::encode_as<UTF16LE>(ex1_utf8)==ex1_utf16le) << "(ex1) utf-8 to utf-16le\n";
+        expect( text::encode_as<UTF16BE>(ex1_utf8)==ex1_utf16be) << "(ex1) utf-8 to utf-16be\n";
+        expect( text::encode_as<UTF32LE>(ex1_utf8)==ex1_utf32le) << "(ex1) utf-8 to utf-32le\n";
+        expect( text::encode_as<UTF32BE>(ex1_utf8)==ex1_utf32be) << "(ex1) utf-8 to utf-32be\n";
+        expect( text::encode_as<UTF8>(ex1_utf16le)==ex1_utf8) << "(ex1) utf-16le to utf-8\n";
+        expect( text::encode_as<UTF16LE>(ex1_utf16le)==ex1_utf16le) << "(ex1) utf-16le to utf-16le\n";
+        expect( text::encode_as<UTF16BE>(ex1_utf16le)==ex1_utf16be) << "(ex1) utf-16le to utf-16be\n";
+        expect( text::encode_as<UTF32LE>(ex1_utf16le)==ex1_utf32le) << "(ex1) utf-16le to utf-32le\n";
+        expect( text::encode_as<UTF32BE>(ex1_utf16le)==ex1_utf32be) << "(ex1) utf-16le to utf-32be\n";
+        expect( text::encode_as<UTF8>(ex1_utf16be)==ex1_utf8) << "(ex1) utf-16be to utf-8\n";
+        expect( text::encode_as<UTF16LE>(ex1_utf16be)==ex1_utf16le) << "(ex1) utf-16be to utf-16le\n";
+        expect( text::encode_as<UTF16BE>(ex1_utf16be)==ex1_utf16be) << "(ex1) utf-16be to utf-16be\n";
+        expect( text::encode_as<UTF32LE>(ex1_utf16be)==ex1_utf32le) << "(ex1) utf-16be to utf-32le\n";
+        expect( text::encode_as<UTF32BE>(ex1_utf16be)==ex1_utf32be) << "(ex1) utf-16be to utf-32be\n";
+        expect( text::encode_as<UTF8>(ex1_utf32le)==ex1_utf8) << "(ex1) utf-32le to utf-8\n";
+        expect( text::encode_as<UTF16LE>(ex1_utf32le)==ex1_utf16le) << "(ex1) utf-32le to utf-16le\n";
+        expect( text::encode_as<UTF16BE>(ex1_utf32le)==ex1_utf16be) << "(ex1) utf-32le to utf-16be\n";
+        expect( text::encode_as<UTF32LE>(ex1_utf32le)==ex1_utf32le) << "(ex1) utf-32le to utf-32le\n";
+        expect( text::encode_as<UTF32BE>(ex1_utf32le)==ex1_utf32be) << "(ex1) utf-32le to utf-32be\n";
+        expect( text::encode_as<UTF8>(ex1_utf32be)==ex1_utf8) << "(ex1) utf-32be to utf-8\n";
+        expect( text::encode_as<UTF16LE>(ex1_utf32be)==ex1_utf16le) << "(ex1) utf-32be to utf-16le\n";
+        expect( text::encode_as<UTF16BE>(ex1_utf32be)==ex1_utf16be) << "(ex1) utf-32be to utf-16be\n";
+        expect( text::encode_as<UTF32LE>(ex1_utf32be)==ex1_utf32le) << "(ex1) utf-32be to utf-32le\n";
+        expect( text::encode_as<UTF32BE>(ex1_utf32be)==ex1_utf32be) << "(ex1) utf-32be to utf-32be\n";
+
+        //log_str( "è una ⛵ ┌─┐"sv );
+        const std::string_view ex2_utf8 = "\xEF\xBB\xBF\xC3\xA8\x20\x75\x6E\x61\x20\xE2\x9B\xB5\x20\xE2\x94\x8C\xE2\x94\x80\xE2\x94\x90"sv;
+        const std::string_view ex2_utf16le = "\xFF\xFE\xE8\x00\x20\x00\x75\x00\x6E\x00\x61\x00\x20\x00\xF5\x26\x20\x00\x0C\x25\x00\x25\x10\x25"sv;
+        const std::string_view ex2_utf16be = "\xFE\xFF\x00\xE8\x00\x20\x00\x75\x00\x6E\x00\x61\x00\x20\x26\xF5\x00\x20\x25\x0C\x25\x00\x25\x10"sv;
+        const std::string_view ex2_utf32le = "\xFF\xFE\x00\x00\xE8\x00\x00\x00\x20\x00\x00\x00\x75\x00\x00\x00\x6E\x00\x00\x00\x61\x00\x00\x00\x20\x00\x00\x00\xF5\x26\x00\x00\x20\x00\x00\x00\x0C\x25\x00\x00\x00\x25\x00\x00\x10\x25\x00\x00"sv;
+        const std::string_view ex2_utf32be = "\x00\x00\xFE\xFF\x00\x00\x00\xE8\x00\x00\x00\x20\x00\x00\x00\x75\x00\x00\x00\x6E\x00\x00\x00\x61\x00\x00\x00\x20\x00\x00\x26\xF5\x00\x00\x00\x20\x00\x00\x25\x0C\x00\x00\x25\x00\x00\x00\x25\x10"sv;
+        expect( text::encode_as<UTF8>(ex2_utf8)==ex2_utf8) << "(ex2) utf-8 to utf-8\n";
+        expect( text::encode_as<UTF16LE>(ex2_utf8)==ex2_utf16le) << "(ex2) utf-8 to utf-16le\n";
+        expect( text::encode_as<UTF16BE>(ex2_utf8)==ex2_utf16be) << "(ex2) utf-8 to utf-16be\n";
+        expect( text::encode_as<UTF32LE>(ex2_utf8)==ex2_utf32le) << "(ex2) utf-8 to utf-32le\n";
+        expect( text::encode_as<UTF32BE>(ex2_utf8)==ex2_utf32be) << "(ex2) utf-8 to utf-32be\n";
+        expect( text::encode_as<UTF8>(ex2_utf16le)==ex2_utf8) << "(ex2) utf-16le to utf-8\n";
+        expect( text::encode_as<UTF16LE>(ex2_utf16le)==ex2_utf16le) << "(ex2) utf-16le to utf-16le\n";
+        expect( text::encode_as<UTF16BE>(ex2_utf16le)==ex2_utf16be) << "(ex2) utf-16le to utf-16be\n";
+        expect( text::encode_as<UTF32LE>(ex2_utf16le)==ex2_utf32le) << "(ex2) utf-16le to utf-32le\n";
+        expect( text::encode_as<UTF32BE>(ex2_utf16le)==ex2_utf32be) << "(ex2) utf-16le to utf-32be\n";
+        expect( text::encode_as<UTF8>(ex2_utf16be)==ex2_utf8) << "(ex2) utf-16be to utf-8\n";
+        expect( text::encode_as<UTF16LE>(ex2_utf16be)==ex2_utf16le) << "(ex2) utf-16be to utf-16le\n";
+        expect( text::encode_as<UTF16BE>(ex2_utf16be)==ex2_utf16be) << "(ex2) utf-16be to utf-16be\n";
+        expect( text::encode_as<UTF32LE>(ex2_utf16be)==ex2_utf32le) << "(ex2) utf-16be to utf-32le\n";
+        expect( text::encode_as<UTF32BE>(ex2_utf16be)==ex2_utf32be) << "(ex2) utf-16be to utf-32be\n";
+        expect( text::encode_as<UTF8>(ex2_utf32le)==ex2_utf8) << "(ex2) utf-32le to utf-8\n";
+        expect( text::encode_as<UTF16LE>(ex2_utf32le)==ex2_utf16le) << "(ex2) utf-32le to utf-16le\n";
+        expect( text::encode_as<UTF16BE>(ex2_utf32le)==ex2_utf16be) << "(ex2) utf-32le to utf-16be\n";
+        expect( text::encode_as<UTF32LE>(ex2_utf32le)==ex2_utf32le) << "(ex2) utf-32le to utf-32le\n";
+        expect( text::encode_as<UTF32BE>(ex2_utf32le)==ex2_utf32be) << "(ex2) utf-32le to utf-32be\n";
+        expect( text::encode_as<UTF8>(ex2_utf32be)==ex2_utf8) << "(ex2) utf-32be to utf-8\n";
+        expect( text::encode_as<UTF16LE>(ex2_utf32be)==ex2_utf16le) << "(ex2) utf-32be to utf-16le\n";
+        expect( text::encode_as<UTF16BE>(ex2_utf32be)==ex2_utf16be) << "(ex2) utf-32be to utf-16be\n";
+        expect( text::encode_as<UTF32LE>(ex2_utf32be)==ex2_utf32le) << "(ex2) utf-32be to utf-32le\n";
+        expect( text::encode_as<UTF32BE>(ex2_utf32be)==ex2_utf32be) << "(ex2) utf-32be to utf-32be\n";
+       };
 
 };///////////////////////////////////////////////////////////////////////////
 #endif // TESTING ///////////////////////////////////////////////////////////

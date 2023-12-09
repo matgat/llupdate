@@ -54,14 +54,13 @@ $ make linux/makefile
 Or directly:
 
 ```sh
-$ g++ -std=c++2b -Wall -Wextra -Wpedantic -Wconversion -O3 -lfmt -o "llupdate" "source/main.cpp"
+$ g++ -std=c++2b -Wall -Wextra -Wpedantic -Wconversion -O3 -lfmt -o "linux/build/llupdate" "source/main.cpp"
 ```
 
 Testing:
 
 ```sh
-$ g++ -std=c++2b -Wall -Wextra -Wpedantic -Wconversion -DTESTING -O3 -lfmt -o "test/llupdate_test" "test/test.cpp"
-$ ./test/llupdate_test
+$ g++ -std=c++2b -Wall -Wextra -Wpedantic -Wconversion -O3 -lfmt -o "linux/build/llupdate_test" "test/test.cpp" && linux/build/llupdate_test
 ```
 
 On Windows use the latest Microsoft Visual Studio Community.

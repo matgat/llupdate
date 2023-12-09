@@ -7,7 +7,6 @@
 #include <cassert>
 #include <string>
 #include <string_view>
-//#include <cuchar> // mbrtoc32, ...
 
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -71,7 +70,7 @@ namespace text
 
 enum class enc_t : std::uint8_t
    {
-    //ANSI,
+    //ANSI, // Nah, time to drop this
     UTF8,
     UTF16LE,
     UTF16BE,
@@ -184,10 +183,10 @@ template<bool LE> char32_t extract_next_codepoint_from_utf16(const std::string_v
     assert( (pos+1)<bytes.size() );
 
     auto get_code_unit = [](const std::string_view buf, const std::size_t i) -> std::uint16_t
-                               {
-                                if constexpr(LE) return details::combine_chars(buf[i+1], buf[i]); // Little endian
-                                else             return details::combine_chars(buf[i], buf[i+1]); // Big endian
-                               };
+                           {
+                            if constexpr(LE) return details::combine_chars(buf[i+1], buf[i]); // Little endian
+                            else             return details::combine_chars(buf[i], buf[i+1]); // Big endian
+                           };
 
     // If the first codeunit is in the intervals [0x0000–0xD800), [0xE000–0xFFFF]
     // then coincides with the codepoint itself (Basic Multilingual Plane)
@@ -253,103 +252,105 @@ template<> char32_t extract_codepoint<enc_t::UTF32BE>(const std::string_view byt
 
 //---------------------------------------------------------------------------
 // Encode: Write a codepoint according to encoding and endianness
-template<enc_t enc> void append_codepoint(const char32_t code_point, std::string& bytes) noexcept;
+template<enc_t enc> void append_codepoint(const char32_t codepoint, std::string& bytes) noexcept;
 
 //---------------------------------------------------------------------------
-//template<> void append_codepoint<enc_t::ANSI>(const char32_t code_point, std::string& bytes) noexcept
+//template<> void append_codepoint<enc_t::ANSI>(const char32_t codepoint, std::string& bytes) noexcept
 //{
-//    bytes += static_cast<char>(code_point); // Narrowing!
+//    bytes += static_cast<char>(codepoint); // Narrowing!
 //}
 
 //---------------------------------------------------------------------------
-template<> void append_codepoint<enc_t::UTF8>(const char32_t code_point, std::string& bytes) noexcept
+template<> void append_codepoint<enc_t::UTF8>(const char32_t codepoint, std::string& bytes) noexcept
 {
-    if( code_point<0x80 ) [[likely]]
+    if( codepoint<0x80 ) [[likely]]
        {
-        bytes.push_back( static_cast<char>(code_point) );
+        bytes.push_back( static_cast<char>(codepoint) );
        }
-    else if( code_point<0x800 )
+    else if( codepoint<0x800 )
        {
-        bytes.push_back( static_cast<char>(0xC0 | (code_point >> 6) ));
-        bytes.push_back( static_cast<char>(0x80 | (code_point & 0x3F)) );
+        bytes.push_back( static_cast<char>(0xC0 | (codepoint >> 6) ));
+        bytes.push_back( static_cast<char>(0x80 | (codepoint & 0x3F)) );
        }
-    else if( code_point<0x10000 )
+    else if( codepoint<0x10000 )
        {
-        bytes.push_back( static_cast<char>(0xE0 | (code_point >> 12)) );
-        bytes.push_back( static_cast<char>(0x80 | ((code_point >> 6) & 0x3F)) );
-        bytes.push_back( static_cast<char>(0x80 | (code_point & 0x3F)) );
+        bytes.push_back( static_cast<char>(0xE0 | (codepoint >> 12)) );
+        bytes.push_back( static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)) );
+        bytes.push_back( static_cast<char>(0x80 | (codepoint & 0x3F)) );
        }
     else
        {
-        bytes.push_back( static_cast<char>(0xF0 | (code_point >> 18)) );
-        bytes.push_back( static_cast<char>(0x80 | ((code_point >> 12) & 0x3F)) );
-        bytes.push_back( static_cast<char>(0x80 | ((code_point >> 6) & 0x3F)) );
-        bytes.push_back( static_cast<char>(0x80 | (code_point & 0x3F)) );
+        bytes.push_back( static_cast<char>(0xF0 | (codepoint >> 18)) );
+        bytes.push_back( static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F)) );
+        bytes.push_back( static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)) );
+        bytes.push_back( static_cast<char>(0x80 | (codepoint & 0x3F)) );
        }
 }
 
 //---------------------------------------------------------------------------
 // Encode a codepoint outside Basic Multilingual Plane
-std::pair<std::uint16_t,std::uint16_t> encode_as_utf16(uint32_t code_point) noexcept
+std::pair<std::uint16_t,std::uint16_t> encode_as_utf16(uint32_t codepoint) noexcept
 {
-    assert( code_point>=0x10000 );
-    code_point -= 0x10000;
-    return { static_cast<std::uint16_t>((code_point >> 10) + 0xD800),
-             static_cast<std::uint16_t>((code_point & 0x3FF) + 0xDC00) };
+    assert( codepoint>=0x10000 );
+    codepoint -= 0x10000;
+    return { static_cast<std::uint16_t>((codepoint >> 10) + 0xD800),
+             static_cast<std::uint16_t>((codepoint & 0x3FF) + 0xDC00) };
 }
 
 //---------------------------------------------------------------------------
-template<> void append_codepoint<enc_t::UTF16LE>(const char32_t code_point, std::string& bytes) noexcept
+template<> void append_codepoint<enc_t::UTF16LE>(const char32_t codepoint, std::string& bytes) noexcept
 {
-    if( code_point<0x10000 ) [[likely]]
+    if( codepoint<0x10000 ) [[likely]]
        {
-        const std::uint16_t codeunit = static_cast<std::uint16_t>(code_point);
+        const std::uint16_t codeunit = static_cast<std::uint16_t>(codepoint);
         bytes.push_back( details::low_byte_of( codeunit) );
         bytes.push_back( details::high_byte_of( codeunit ) );
-        return;
        }
-
-    const auto codeunits = encode_as_utf16(code_point);
-    bytes.push_back( details::low_byte_of( codeunits.first ) );
-    bytes.push_back( details::high_byte_of( codeunits.first ) );
-    bytes.push_back( details::low_byte_of( codeunits.second ) );
-    bytes.push_back( details::high_byte_of( codeunits.second ) );
+    else
+       {
+        const auto codeunits = encode_as_utf16(codepoint);
+        bytes.push_back( details::low_byte_of( codeunits.first ) );
+        bytes.push_back( details::high_byte_of( codeunits.first ) );
+        bytes.push_back( details::low_byte_of( codeunits.second ) );
+        bytes.push_back( details::high_byte_of( codeunits.second ) );
+       }
 }
 
 //---------------------------------------------------------------------------
-template<> void append_codepoint<enc_t::UTF16BE>(const char32_t code_point, std::string& bytes) noexcept
+template<> void append_codepoint<enc_t::UTF16BE>(const char32_t codepoint, std::string& bytes) noexcept
 {
-    if( code_point<0x10000 ) [[likely]]
+    if( codepoint<0x10000 ) [[likely]]
        {
-        const std::uint16_t codeunit = static_cast<std::uint16_t>(code_point);
+        const std::uint16_t codeunit = static_cast<std::uint16_t>(codepoint);
         bytes.push_back( details::high_byte_of( codeunit ) );
         bytes.push_back( details::low_byte_of( codeunit) );
-        return;
        }
-
-    const auto codeunits = encode_as_utf16(code_point);
-    bytes.push_back( details::high_byte_of( codeunits.first ) );
-    bytes.push_back( details::low_byte_of( codeunits.first ) );
-    bytes.push_back( details::high_byte_of( codeunits.second ) );
-    bytes.push_back( details::low_byte_of( codeunits.second ) );
+    else
+       {
+        const auto codeunits = encode_as_utf16(codepoint);
+        bytes.push_back( details::high_byte_of( codeunits.first ) );
+        bytes.push_back( details::low_byte_of( codeunits.first ) );
+        bytes.push_back( details::high_byte_of( codeunits.second ) );
+        bytes.push_back( details::low_byte_of( codeunits.second ) );
+       }
 }
 
 //---------------------------------------------------------------------------
-template<> void append_codepoint<enc_t::UTF32LE>(const char32_t code_point, std::string& bytes) noexcept
+template<> void append_codepoint<enc_t::UTF32LE>(const char32_t codepoint, std::string& bytes) noexcept
 {
-    bytes.push_back( details::ll_byte_of( code_point ) );
-    bytes.push_back( details::lh_byte_of( code_point ) );
-    bytes.push_back( details::hl_byte_of( code_point ) );
-    bytes.push_back( details::hh_byte_of( code_point ) );
+    bytes.push_back( details::ll_byte_of( codepoint ) );
+    bytes.push_back( details::lh_byte_of( codepoint ) );
+    bytes.push_back( details::hl_byte_of( codepoint ) );
+    bytes.push_back( details::hh_byte_of( codepoint ) );
 }
 
 //---------------------------------------------------------------------------
-template<> void append_codepoint<enc_t::UTF32BE>(const char32_t code_point, std::string& bytes) noexcept
+template<> void append_codepoint<enc_t::UTF32BE>(const char32_t codepoint, std::string& bytes) noexcept
 {
-    bytes.push_back( details::hh_byte_of( code_point ) );
-    bytes.push_back( details::hl_byte_of( code_point ) );
-    bytes.push_back( details::lh_byte_of( code_point ) );
-    bytes.push_back( details::ll_byte_of( code_point ) );
+    bytes.push_back( details::hh_byte_of( codepoint ) );
+    bytes.push_back( details::hl_byte_of( codepoint ) );
+    bytes.push_back( details::lh_byte_of( codepoint ) );
+    bytes.push_back( details::ll_byte_of( codepoint ) );
 }
 
 
@@ -400,42 +401,61 @@ template<enc_t ENC> class buffer_t final
 };
 
 
+
 //---------------------------------------------------------------------------
-//template<text::enc_t enc> std::string convert(const std::string_view bytes)
-//{
-//    text::buffer_t<enc> text_buf(bytes);
-//    while( text_buf.has_codepoint() )
-//       {
-//        const char32_t codepoint = text_buf.extract_codepoint();
-//        // ...
-//       }
-//    // Detect truncated
-//    if( text_buf.has_bytes() )
-//       {
-//        // Truncated codepoint!
-//       }
-//}
+// Re-encode a buffer encoded as in_enc to out_enc
+template<text::enc_t in_enc,text::enc_t out_enc> std::string re_encode(const std::string_view in_bytes)
+{
+    std::string out_bytes;
+    out_bytes.reserve( in_bytes.size() );
+
+    text::buffer_t<in_enc> text_buf(in_bytes);
+    while( text_buf.has_codepoint() )
+       {
+        const char32_t codepoint = text_buf.extract_codepoint();
+        append_codepoint<out_enc>(codepoint, out_bytes);
+       }
+
+    // Detect truncated
+    if( text_buf.has_bytes() )
+       {// Truncated codepoint!
+        append_codepoint<out_enc>(err_char, out_bytes);
+       }
+
+    return out_bytes;
+}
 
 
 //---------------------------------------------------------------------------
-//[[nodiscard]] constexpr std::string iso_latin1_to_utf8(const std::string_view ansi)
-//{
-//    std::string utf8;
-//    utf8.reserve( (3 * ansi.size()) / 2 );
-//    for( std::size_t i=0; i<ansi.size(); ++i )
-//       {
-//        if( !(ansi[i] & '\x80') ) // ansi[i] < 128
-//           {
-//            utf8 += ansi[i];
-//           }
-//        else
-//           {
-//            utf8 += '\xC0' | (ansi[i] >> 6);
-//            utf8 += '\x80' | (ansi[i] & '\x3f');
-//           }
-//       }
-//    return utf8;
-//}
+// const std::string out_bytes = text::encode_as<text::enc_t::UTF8>(in_bytes);
+template<text::enc_t out_enc> std::string encode_as(const std::string_view in_bytes)
+{
+    const auto [in_enc, bom_size] = detect_encoding_of(in_bytes);
+    if( in_enc==out_enc )
+       {
+        return std::string(in_bytes);
+       }
+
+    switch( in_enc )
+       {using enum text::enc_t;
+
+        case UTF8:
+            return re_encode<UTF8,out_enc>(in_bytes);
+
+        case UTF16LE:
+            return re_encode<UTF16LE,out_enc>(in_bytes);
+
+        case UTF16BE:
+            return re_encode<UTF16BE,out_enc>(in_bytes);
+
+        case UTF32LE:
+            return re_encode<UTF32LE,out_enc>(in_bytes);
+
+        case UTF32BE:
+            return re_encode<UTF32BE,out_enc>(in_bytes);
+       }
+    assert(false); // std::unreachable();
+}
 
 
 }//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
