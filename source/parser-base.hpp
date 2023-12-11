@@ -1,16 +1,19 @@
-#ifndef GUARD_parser_base_hpp
-#define GUARD_parser_base_hpp
+#pragma once
 //  ---------------------------------------------
 //  Common encoding agnostic parsing facilities
 //  ---------------------------------------------
+#include <cassert>
+#include <concepts>
 #include <stdexcept> // std::exception, std::runtime_error, ...
-#include <vector>
 #include <string_view>
 #include <fmt/core.h> // fmt::format
 
-#include "text.hpp" // text::buffer_t
-#include "debug.hpp" // DLOG#
+#include "text.hpp" // text::*
 
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+namespace MG
+{
 
 /////////////////////////////////////////////////////////////////////////////
 class parse_error final : public std::exception
@@ -32,439 +35,196 @@ class parse_error final : public std::exception
 };
 
 
+//---------------------------------------------------------------------------
+void default_notify(const std::string_view) noexcept
+   {
+   }
+
+   
+//template <typename F>
+//concept notify_fun = requires(F f, std::string_view msg)
+//   {
+//    f(msg);
+//   };
+
 /////////////////////////////////////////////////////////////////////////////
-template<typename buf_t> class Parser_Base
+template<text::Enc enc, auto fnotify =default_notify> class ParserBase
 {
- protected:
-    const char* const buf;
-    const std::size_t siz; // buffer size
-    const std::size_t i_last; // index of the last character
-    std::size_t i; // Current character
-    std::size_t line; // Current line number
-    std::vector<std::string>& issues; // Problems found
+    using buffer_t = text::buffer_t<enc>;
+
+    buffer_t m_buf;
+    char32_t m_curr_codepoint = text::null_codepoint; // Current extracted character
+    std::size_t m_line = 1; // Current line number
 
  public:
-    Parser_Base(const text::buffer_t& buf,
-                std::vector<std::string>& lst )
-      : buf(dat.data())
-      , siz(dat.size())
-      , i_last(siz-1u) // siz>0
-      , line(1)
-      , i(0)
-      , issues(lst)
+    ParserBase(const std::string_view bytes) noexcept
+      : m_buf(bytes)
        {
-        if( i>=siz )
-           {
-            throw std::runtime_error("No data to parse (empty file?)");
-           }
        }
 
-    Parser_Base(const Parser_Base&) = delete; // Prevent copy
-    Parser_Base(Parser_Base&&) = delete; // Prevent move
-    Parser_Base& operator=(const Parser_Base&) = delete; // Prevent copy assignment
-    Parser_Base& operator=(Parser_Base&&) = delete; // Prevent move assignment
-    ~Parser_Base() = default; // Yes, destructor is not virtual
+    ParserBase(const ParserBase&) = delete; // Prevent copy
+    ParserBase(ParserBase&&) = delete; // Prevent move
+    ParserBase& operator=(const ParserBase&) = delete; // Prevent copy assignment
+    ParserBase& operator=(ParserBase&&) = delete; // Prevent move assignment
+    ~ParserBase() = default; // Yes, destructor is not virtual
 
 
     //-----------------------------------------------------------------------
-    [[nodiscard]] bool has_data() const noexcept { return i<siz; }
-    [[nodiscard]] std::size_t curr_line() const noexcept { return line; }
-    [[nodiscard]] std::size_t curr_pos() const noexcept { return i; }
+    //[[nodiscard]] bool has_data() const noexcept { return m_buf.has_bytes(); }
+    [[nodiscard]] char32_t curr_codepoint() const noexcept { return m_curr_codepoint; }
+    [[nodiscard]] std::size_t curr_line() const noexcept { return m_line; }
 
 
+ protected:
     //-----------------------------------------------------------------------
     void notify_issue(const std::string_view msg) const noexcept
        {
-        issues.push_back( fmt::format("{} (line {}, offset {})", msg, line, i) );
+        fnotify( fmt::format("{} (line {}, offset {})", msg, m_line, m_buf.byte_pos()) );
        }
     parse_error create_parse_error(const std::string_view msg) const noexcept
        {
-        return parse_error(msg, line, i<=i_last ? i : i_last);
+        return parse_error(msg, m_line, m_buf.byte_pos());
        }
-    parse_error create_parse_error(const std::string_view msg, const std::size_t lin, const std::size_t off) const noexcept
-       {
-        return parse_error(msg, lin, off<=i_last ? off : i_last);
-       }
+    //parse_error create_parse_error(const std::string_view msg, const std::size_t lin, const std::size_t off) const noexcept
+    //   {
+    //    return parse_error(msg, lin, off);
+    //   }
 
- protected:
-
-    //-----------------------------------------------------------------------
-    [[nodiscard]] static bool is_identifier(const char ch) noexcept
-       {
-        return std::isalnum(ch) || ch=='_';
-       }
 
     //-----------------------------------------------------------------------
-    [[nodiscard]] static bool is_numeric_literal(const char ch) noexcept
+    // Extract next codepoint from buffer
+    [[nodiscard]] bool get_next()
        {
-        return std::isdigit(ch) || ch=='+' || ch=='-' || ch=='.' || ch=='E';
+        if( m_buf.has_codepoint() ) [[likely]]
+           {
+            m_curr_codepoint = m_buf.extract_codepoint();
+            // Detect line increment? Nah, use eat_line_end()
+            //if( text::is_endline(m_curr_codepoint) ) ++m_line;
+            return true;
+           }
+        else if( m_buf.has_bytes() )
+           {// Truncated codepoint!
+            m_curr_codepoint = text::err_codepoint;
+            throw create_parse_error("Truncated codepoint");
+           }
+        m_curr_codepoint = text::null_codepoint;
+        return false;
        }
 
     //-----------------------------------------------------------------------
-    [[nodiscard]] static bool is_blank(const char ch) noexcept
+    // Querying current codepoint
+    [[nodiscard]] bool is(const char32_t cp) noexcept
        {
-        return std::isspace(ch) && ch!='\n';
+        return m_curr_codepoint == cp;
+       }
+    [[nodiscard]] bool is_endline() noexcept
+       {
+        return text::is_endline(m_curr_codepoint);
+       }
+    [[nodiscard]] bool is_space() noexcept
+       {
+        return text::is_space(m_curr_codepoint);
+       }
+    [[nodiscard]] bool is_blank() noexcept
+       {
+        return text::is_blank(m_curr_codepoint);
+       }
+    [[nodiscard]] bool is_digit() noexcept
+       {
+        return text::is_digit(m_curr_codepoint);
        }
 
     //-----------------------------------------------------------------------
-    // Skip space chars except new line
+    // Skip spaces except new line
     void skip_blanks() noexcept
        {
-        while( i<siz && is_blank(buf[i]) ) ++i;
+        while( is_blank() && get_next() ) ;
        }
 
     //-----------------------------------------------------------------------
     // Skip any space, including new line
     void skip_any_space() noexcept
        {
-        while( i<siz && std::isspace(buf[i]) )
+        while( is_space() )
            {
-            if( buf[i]=='\n' ) ++line;
-            ++i;
+            if( is_endline() ) ++m_line;
+            get_next();
            }
        }
-
-    //-----------------------------------------------------------------------
-    // Tell if skipped any space, including new line
-    //[[nodiscard]] bool eat_any_space() noexcept
-    //   {
-    //    assert(i<siz);
-    //    if( std::isspace(buf[i]) )
-    //       {
-    //        do {
-    //            if( buf[i]=='\n' ) ++line;
-    //            ++i;
-    //           }
-    //        while( i<siz && std::isspace(buf[i]) );
-    //        return true;
-    //       }
-    //    return false;
-    //   }
 
     //-----------------------------------------------------------------------
     [[maybe_unused]] bool eat_line_end() noexcept
        {
-        assert(i<siz);
-        if( buf[i]=='\n' )
+        if( is_endline() )
            {
-            ++i;
-            ++line;
+            ++m_line;
             return true;
            }
         return false;
        }
-
 
     //-----------------------------------------------------------------------
     // Skip empty lines
     void skip_empty_lines() noexcept
        {
-        do{ skip_blanks(); }
+        do{
+           skip_blanks();
+          }
         while( eat_line_end() );
        }
 
-
     //-----------------------------------------------------------------------
-    void check_if_line_ended_after(const std::string_view fmt_str, const std::string_view fmt_arg)
-       {
-        skip_blanks();
-        if( !eat_line_end() )
-           {
-            notify_issue("Unexpected content after {}: {}", fmt::format(fmt::runtime(fmt_str), fmt_arg), str::escape(skip_line()));
-           }
-       }
-
-
-    //-----------------------------------------------------------------------
-    [[maybe_unused]] std::string_view skip_line() noexcept
-       {
-        // Intercept the edge case already at buffer end:
-        if(i>i_last) return std::string_view(buf+i_last, 0);
-
-        const std::size_t i_start = i;
-        while( i<siz && !eat_line_end() ) ++i;
-        return std::string_view(buf+i_start, i-i_start);
-        // Note: If '\n' not found returns what remains in buf and i==siz
-       }
-
-
-    //-----------------------------------------------------------------------
-    //void skip_line_check_no_further_content()
+    //void ensure_line_ended_here()
     //   {
-    //    while( i<siz && !eat_line_end() )
+    //    skip_blanks();
+    //    if( !eat_line_end() )
     //       {
-    //        if( !std::isspace(buf[i]) )
-    //           {
-    //            notify_issue("Unexpected content: {}", str::escape(skip_line()));
-    //           }
-    //        ++i;
+    //        throw create_parse_error("Unexpected content at line end");
     //       }
     //   }
 
+    //-----------------------------------------------------------------------
+    void skip_line() noexcept
+       {
+        while( eat_line_end() )
+           {
+            get_next();
+           }
+       }
 
     //-----------------------------------------------------------------------
-    [[nodiscard]] bool eat(const char ch) noexcept
+    [[nodiscard]] bool eat(const char32_t cp) noexcept
        {
-        assert(i<siz);
-        if( buf[i]==ch )
+        if( is(cp) )
            {
-            ++i; // Skip ch
+            get_next();
             return true;
            }
         return false;
        }
-
-
-    //-----------------------------------------------------------------------
-    [[nodiscard]] bool eat(const std::string_view s) noexcept
-       {
-        const std::size_t i_end = i+s.length();
-        if( i_end<=siz && s==std::string_view(buf+i,s.length()) )
-           {
-            i = i_end;
-            return true;
-           }
-        return false;
-       }
-
-
-    //-----------------------------------------------------------------------
-    [[nodiscard]] bool eat_token(const std::string_view s) noexcept
-       {
-        const std::size_t i_end = i+s.length();
-        if( ((i_end<siz && !std::isalnum(buf[i_end])) || i_end==siz) && s==std::string_view(buf+i,s.length()) )
-           {
-            i = i_end;
-            return true;
-           }
-        return false;
-       }
-
-
-    //-----------------------------------------------------------------------
-    [[nodiscard]] std::string_view collect_token() noexcept
-       {
-        assert(i<siz);
-        const std::size_t i_start = i;
-        while( i<siz && !std::isspace(buf[i]) ) ++i;
-        return std::string_view(buf+i_start, i-i_start);
-       }
-
-
-    //-----------------------------------------------------------------------
-    [[nodiscard]] std::string_view collect_identifier() noexcept
-       {
-        assert(i<siz);
-        const std::size_t i_start = i;
-        while( i<siz && is_identifier(buf[i]) ) ++i;
-        return std::string_view(buf+i_start, i-i_start);
-       }
-
-
-    //-----------------------------------------------------------------------
-    [[nodiscard]] std::string_view collect_numeric_value() noexcept
-       {
-        assert(i<siz);
-        const std::size_t i_start = i;
-        while( i<siz && is_numeric_literal(buf[i]) ) ++i;
-        return std::string_view(buf+i_start, i-i_start);
-       }
-
-
-    //-----------------------------------------------------------------------
-    [[nodiscard]] std::string_view collect_digits() noexcept
-       {
-        assert(i<siz);
-        const std::size_t i_start = i;
-        while( i<siz && std::isdigit(buf[i]) ) ++i;
-        return std::string_view(buf+i_start, i-i_start);
-       }
-
 
     //-----------------------------------------------------------------------
     // Read a (base10) positive integer literal
     [[nodiscard]] std::size_t extract_index()
        {
-        if( i>=siz )
+        if( !is_digit() )
            {
-            throw create_parse_error("Index not found");
+            throw create_parse_error(fmt::format("Invalid char \'{}\' in index", curr_codepoint()));
            }
 
-        if( buf[i]=='+' )
-           {
-            ++i;
-            if( i>=siz )
-               {
-                throw create_parse_error("Invalid index \'+\'");
-               }
-           }
-        else if( buf[i]=='-' )
-           {
-            throw create_parse_error("Index can\'t be negative");
-           }
-
-        if( !std::isdigit(buf[i]) )
-           {
-            throw create_parse_error(fmt::format("Invalid char \'{}\' in index", buf[i]));
-           }
-
-        std::size_t result = (buf[i]-'0');
+        std::size_t result = (curr_codepoint()-U'0');
         const std::size_t base = 10u;
-        while( ++i<siz && std::isdigit(buf[i]) )
+        while( get_next() && is_digit() )
            {
-            result = (base*result) + (buf[i]-'0');
+            result = (base*result) + (curr_codepoint()-U'0');
            }
         return result;
        }
-
-
-    //-----------------------------------------------------------------------
-    // Read a (base10) integer literal
-    [[nodiscard]] int extract_integer()
-       {
-        if( i>=siz )
-           {
-            throw create_parse_error("No integer found");
-           }
-        int sign = 1;
-        if( buf[i]=='+' )
-           {
-            //sign = 1;
-            ++i;
-            if( i>=siz )
-               {
-                throw create_parse_error("Invalid integer \'+\'");
-               }
-           }
-        else if( buf[i]=='-' )
-           {
-            sign = -1;
-            ++i;
-            if( i>=siz )
-               {
-                throw create_parse_error("Invalid integer \'-\'");
-               }
-           }
-        if( !std::isdigit(buf[i]) )
-           {
-            throw create_parse_error(fmt::format("Invalid char \'{}\' in integer", buf[i]));
-           }
-        int result = (buf[i]-'0');
-        const int base = 10;
-        while( ++i<siz && std::isdigit(buf[i]) )
-           {
-            result = (base*result) + (buf[i]-'0');
-           }
-        return sign * result;
-       }
-
-
-    //-----------------------------------------------------------------------
-    //[[nodiscard]] std::string_view collect_until_char(const char ch)
-    //   {
-    //    const std::size_t i_start = i;
-    //    while( i<siz )
-    //       {
-    //        if( buf[i]==ch )
-    //           {
-    //            //DLOG1("    [*] Collected \"{}\" at line {}\n", std::string_view(buf+i_start, i-i_start), line)
-    //            return std::string_view(buf+i_start, i-i_start);
-    //           }
-    //        else if( buf[i]=='\n' ) ++line;
-    //        ++i;
-    //       }
-    //    throw create_parse_error(fmt::format("Unclosed content (\'{}\' expected)", str::escape(ch)));
-    //   }
-
-
-    //-----------------------------------------------------------------------
-    //[[nodiscard]] std::string_view collect_until_char_same_line(const char ch)
-    //   {
-    //    const std::size_t i_start = i;
-    //    while( i<siz )
-    //       {
-    //        if( buf[i]==ch )
-    //           {
-    //            //DLOG1("    [*] Collected \"{}\" at line {}\n", std::string_view(buf+i_start, i-i_start), line)
-    //            return std::string_view(buf+i_start, i-i_start);
-    //           }
-    //        else if( buf[i]=='\n' ) break;
-    //        ++i;
-    //       }
-    //    throw create_parse_error(fmt::format("Unclosed content (\'{}\' expected)", str::escape(ch)));
-    //   }
-
-
-    //-----------------------------------------------------------------------
-    [[nodiscard]] std::string_view collect_until_char_trimmed(const char ch)
-       {
-        const std::size_t line_start = line; // Store current line...
-        const std::size_t i_start = i;       // ...and position
-        std::size_t i_end = i_start; // Index past last char not blank
-        while( i<siz )
-           {
-            if( buf[i]==ch )
-               {
-                //++i; // Nah, do not eat ch
-                return std::string_view(buf+i_start, i_end-i_start);
-               }
-            else if( buf[i]=='\n' )
-               {
-                ++line;
-                ++i;
-               }
-            else
-               {
-                if( !is_blank(buf[i]) ) i_end = ++i;
-                else ++i;
-               }
-           }
-        throw create_parse_error(fmt::format("Unclosed content (\'{}\' expected)", str::escape(ch)), line_start, i_start);
-       }
-
-
-    //-----------------------------------------------------------------------
-    //[[nodiscard]] std::string_view collect_until_token(const std::string_view tok)
-    //   {
-    //    const std::size_t i_start = i;
-    //    const std::size_t max_siz = siz-tok.length();
-    //    while( i<max_siz )
-    //       {
-    //        if( buf[i]==tok[0] && eat_token(tok) )
-    //           {
-    //            return std::string_view(buf+i_start, i-i_start-tok.length());
-    //           }
-    //        else if( buf[i]=='\n' ) ++line;
-    //        ++i;
-    //       }
-    //    throw create_parse_error(fmt::format("Unclosed content (\"{}\" expected)",tok), line_start, i_start);
-    //   }
-
-
-    //-----------------------------------------------------------------------
-    [[nodiscard]] std::string_view collect_until_newline_token(const std::string_view tok)
-       {
-        const std::size_t line_start = line;
-        const std::size_t i_start = i;
-        while( i<siz )
-           {
-            if( buf[i]=='\n' )
-               {
-                ++i;
-                ++line;
-                skip_blanks();
-                if( eat_token(tok) )
-                   {
-                    return std::string_view(buf+i_start, i-i_start-tok.length());
-                   }
-               }
-            else ++i;
-           }
-        throw create_parse_error(fmt::format("Unclosed content (\"{}\" expected)",tok), line_start, i_start);
-       }
 };
 
+}//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 
-//---- end unit -------------------------------------------------------------
-#endif
+
+// TESTS
+

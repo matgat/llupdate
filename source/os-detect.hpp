@@ -1,5 +1,4 @@
-#ifndef GUARD_os_detect_hpp
-#define GUARD_os_detect_hpp
+#pragma once
 //  ---------------------------------------------
 //  Set some unified preprocessor macros
 //  depending on host operating system
@@ -14,7 +13,4 @@
 #else
   #undef MS_WINDOWS
   #undef POSIX
-#endif
-
-//---- end unit -------------------------------------------------------------
 #endif

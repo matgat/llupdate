@@ -1,5 +1,4 @@
-#ifndef GUARD_system_base_hpp
-#define GUARD_system_base_hpp
+#pragma once
 //  ---------------------------------------------
 //  Basic system facilities
 //  ---------------------------------------------
@@ -123,8 +122,3 @@ void execute(const char* const exe, Args&&... args) noexcept
 
 
 }//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-
-
-//---- end unit -------------------------------------------------------------
-#endif

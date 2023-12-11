@@ -1,5 +1,4 @@
-#ifndef GUARD_memory_mapped_file_hpp
-#define GUARD_memory_mapped_file_hpp
+#pragma once
 //  ---------------------------------------------
 //  A file buffered in memory
 //  ---------------------------------------------
@@ -125,8 +124,3 @@ class memory_mapped_file final
 };
 
 }//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-
-
-//---- end unit -------------------------------------------------------------
-#endif

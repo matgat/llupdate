@@ -1,5 +1,4 @@
-#ifndef GUARD_project_updater_hpp
-#define GUARD_project_updater_hpp
+#pragma once
 //  ---------------------------------------------
 //  Updates the libraries in a LogicLab project
 //  ---------------------------------------------
@@ -56,9 +55,15 @@ enum class project_type : std::uint8_t { ppjs, plcprj };
 //---------------------------------------------------------------------------
 void update_project( const fs::path& prj_pth, fs::path out_pth, std::vector<std::string>& issues )
 {
-   const project_type prj_type = recognize_project_type(prj_pth);
-   const sys::memory_mapped_file mem_mapped_file{prj_pth.string()};
-   const std::string_view bytes{mem_mapped_file.as_string_view()};
+    const project_type prj_type = recognize_project_type(prj_pth);
+    const sys::memory_mapped_file mem_mapped_file{prj_pth.string()};
+    const std::string_view bytes{mem_mapped_file.as_string_view()};
+   
+    if( bytes.empty() )
+       {
+        throw std::runtime_error("No data to parse (empty file?)");
+       }
+   
    const auto [enc, bom_size] = text::detect_encoding_of(bytes);
 
    switch( prj_type )
@@ -72,7 +77,7 @@ void update_project( const fs::path& prj_pth, fs::path out_pth, std::vector<std:
        }
 
     switch( enc )
-       {using enum text::enc_t;
+       {using enum text::Enc;
 
         case UTF8:
             //parse<UTF8>(buf);
@@ -99,10 +104,8 @@ void update_project( const fs::path& prj_pth, fs::path out_pth, std::vector<std:
     //if( out_pth.empty )
     //   {
     //   }
+    
+    issues.push_back("Doing nothing for now");
 }
 
 }//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-
-//---- end unit -------------------------------------------------------------
-#endif
