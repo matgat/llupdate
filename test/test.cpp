@@ -1,12 +1,13 @@
-#include <array>
-
-#define BOOST_UT_DISABLE_MODULE
+﻿#define BOOST_UT_DISABLE_MODULE
 #include "ut.hpp" // import boost.ut;
 namespace ut = boost::ut;
 
 #define TEST_UNITS // Include units embedded tests
-#include "../source/text.hpp" // text::*
-#include "../source/parser-base.hpp" // MG::ParserBase
+#include "text.hpp" // text::*
+#include "vectmap.hpp" // MG::vectmap<>
+#include "parser-base.hpp" // MG::ParserBase
+//#include "parser-xml.hpp" // xml::Parser
+//#include "project-updater.hpp" // ll::update_project()
 
 // Custom reporter
 //#include <iostream>
@@ -27,30 +28,28 @@ namespace ut = boost::ut;
 //inline auto ut::cfg<ut::override, Ts...> = ft::runner<ut::reporter<>>{};
 
 
-
 /////////////////////////////////////////////////////////////////////////////
 #ifdef TEST_UNITS ///////////////////////////////////////////////////////////
-static ut::suite<"MG::ParserBase"> ParserBase_tests = []
-{ ///////////////////////////////////////////////////////////////////////////
-    using ut::expect;
+static ut::suite<"xml::Parser"> XmlParser_tests = []
+{////////////////////////////////////////////////////////////////////////////
     using namespace std::literals; // "..."sv
+    using ut::expect;
+    using ut::that;
+    using ut::throws;
+    using enum text::Enc;
+
+    //auto notify = [](const std::string_view msg) -> void { ut::log << msg; };
 
     ut::test("empty") = []
        {
-        MG::ParserBase<text::Enc::UTF8> parser{""sv};
-        expect( parser.curr_codepoint() == text::null_codepoint );
-        //expect(throws([] { parser.get_next() })) << "should complain if...";
-       };
-
-    ut::test("simple utf-8") = []
-       {
-        MG::ParserBase<text::Enc::UTF8> parser{""sv};
-        expect( parser.curr_codepoint() == text::null_codepoint );
+        //xml::Parser<UTF8> parser{""sv};
        };
 
 };///////////////////////////////////////////////////////////////////////////
-#endif // TESTING ///////////////////////////////////////////////////////////
+#endif // TEST_UNITS ////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
+
+
 
 
     //using namespace boost::ut;
@@ -63,7 +62,7 @@ static ut::suite<"MG::ParserBase"> ParserBase_tests = []
     //expect(eq(1, 2));       // eq/neq/gt/ge/lt/le
 
     //expect((1 == 2_i) >> fatal); // fatal assertion
-    //expect(42l == 42_l and 1 == 2_i) << "additional info";
+    //expect(42l == 42_l and 1 == 2_i) << "additional info\n";
 
     //"lazy log"_test = [] {
     //  std::expected<bool, std::string> e = std::unexpected("lazy evaluated");
@@ -77,7 +76,7 @@ static ut::suite<"MG::ParserBase"> ParserBase_tests = []
 
     //"logging"_test = [] {
     //  log << "pre " << 42;
-    //  expect(42_i == 43) << "message on failure";
+    //  expect(42_i == 43) << "message on failure\n";
     //  log << "post " << 43;
     //};
 
@@ -101,9 +100,9 @@ static ut::suite<"MG::ParserBase"> ParserBase_tests = []
     //};
 
     // "exception/aborts"_test = [] {
-    //   expect(throws<std::runtime_error>([] { throw std::runtime_error{""}; })) << "should throw runtime_error";
-    //   expect(throws([] { throw 0; })) << "should throw any exception";
-    //   expect(nothrow([]{})) << "should't throw";
+    //   expect(throws<std::runtime_error>([] { throw std::runtime_error{""}; })) << "should throw runtime_error\n";
+    //   expect(throws([] { throw 0; })) << "should throw any exception\n";
+    //   expect(nothrow([]{})) << "should't throw\n";
     //   expect(aborts([] { assert(false); }));
     // };
 
@@ -155,12 +154,12 @@ static ut::suite<"MG::ParserBase"> ParserBase_tests = []
     //      expect(sum(1) <= 1_i);
     //    };
     //
-    //    "message"_test = [] { expect(3_i == sum(1, 2)) << "wrong sum"; };
+    //    "message"_test = [] { expect(3_i == sum(1, 2)) << "wrong sum\n"; };
     //
     //    "expressions"_test = [] {
     //      expect(0_i == sum() and 42_i == sum(40, 2));
     //      expect(1_i == sum() or 0_i == sum());
-    //      expect(1_i == sum() or (sum() != 0_i or sum(1) > 0_i)) << "compound";
+    //      expect(1_i == sum() or (sum() != 0_i or sum(1) > 0_i)) << "compound\n";
     //    };
     //
     //    "that"_test = [] {
@@ -177,9 +176,9 @@ static ut::suite<"MG::ParserBase"> ParserBase_tests = []
     //    };
     //
     //    "floating points"_test = [] {
-    //      expect(42.1_d == 42.101) << "epsilon=0.1";
-    //      expect(42.10_d == 42.101) << "epsilon=0.01";
-    //      expect(42.10000001 == 42.1_d) << "epsilon=0.1";
+    //      expect(42.1_d == 42.101) << "epsilon=0.1\n";
+    //      expect(42.10_d == 42.101) << "epsilon=0.01\n";
+    //      expect(42.10000001 == 42.1_d) << "epsilon=0.1\n";
     //    };
     //
     //    "strings"_test = [] {
@@ -269,5 +268,5 @@ int main()
 //    "sub2"_test = [] { expect(43 == 42_i); };
 //  };
 //
-//  "don't run"_test = [] { expect(0 == 1_i) << "don't run"; };
+//  "don't run"_test = [] { expect(0 == 1_i) << "don't run\n"; };
 //}

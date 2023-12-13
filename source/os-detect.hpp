@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 //  ---------------------------------------------
 //  Set some unified preprocessor macros
 //  depending on host operating system

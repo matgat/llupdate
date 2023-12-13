@@ -47,7 +47,7 @@ NF_02_LB=git pull
 NF_02_CM=git pull
 NF_02_WD=%p
 EX_00_LB=Run tests
-EX_00_CM=g++ -std=c++2b -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wfatal-errors -O3 -lfmt -o "linux/build/llupdate-test" "test/test.cpp" && "linux/build/llupdate-test"
+EX_00_CM=g++ -std=c++2b -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wfatal-errors -O3 -lfmt -Isource -o "linux/build/llupdate-test" "test/test.cpp" && "linux/build/llupdate-test"
 EX_00_WD=%p
 EX_01_LB=Execute
 EX_01_CM=./llupdate -h

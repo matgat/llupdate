@@ -1,10 +1,9 @@
-#pragma once
+﻿#pragma once
 //  ---------------------------------------------
 //  Encoding aware text utilities
 //  ---------------------------------------------
 #include <cassert>
 #include <cstdint> // std::uint8_t, std::uint16_t, ...
-#include <cctype> // std::isspace(), ...
 #include <utility> // std::unreachable()
 #include <string>
 #include <string_view>
@@ -367,12 +366,15 @@ template<Enc ENC> class buffer_t final
  public:
     explicit constexpr buffer_t(const std::string_view bytes) noexcept
       : m_byte_buf(bytes)
-       {
-       }
+       {}
 
     [[nodiscard]] constexpr bool has_bytes() const noexcept
        {
         return m_byte_pos<m_byte_buf.size();
+       }
+    void set_as_depleted() noexcept
+       {
+        m_byte_pos = m_byte_buf.size();
        }
 
     [[nodiscard]] constexpr bool has_codepoint() const noexcept
@@ -404,23 +406,24 @@ template<Enc ENC> class buffer_t final
 
 
 //---------------------------------------------------------------------------
-// Re-encode a buffer encoded as in_enc to out_enc
-template<text::Enc in_enc,text::Enc out_enc> constexpr std::string re_encode(const std::string_view in_bytes)
+// Re-encode a buffer encoded as INENC to OUTENC
+// const std::string out_bytes = text::re_encode<UTF16LE,UTF8>(in_bytes);
+template<text::Enc INENC,text::Enc OUTENC> constexpr std::string re_encode(const std::string_view in_bytes)
 {
     std::string out_bytes;
     out_bytes.reserve( in_bytes.size() );
 
-    text::buffer_t<in_enc> text_buf(in_bytes);
+    text::buffer_t<INENC> text_buf(in_bytes);
     while( text_buf.has_codepoint() )
        {
         const char32_t codepoint = text_buf.extract_codepoint();
-        append_codepoint<out_enc>(codepoint, out_bytes);
+        append_codepoint<OUTENC>(codepoint, out_bytes);
        }
 
     // Detect truncated
     if( text_buf.has_bytes() )
        {// Truncated codepoint!
-        append_codepoint<out_enc>(err_codepoint, out_bytes);
+        append_codepoint<OUTENC>(err_codepoint, out_bytes);
        }
 
     return out_bytes;
@@ -429,10 +432,10 @@ template<text::Enc in_enc,text::Enc out_enc> constexpr std::string re_encode(con
 
 //---------------------------------------------------------------------------
 // const std::string out_bytes = text::encode_as<text::Enc::UTF8>(in_bytes);
-template<text::Enc out_enc> constexpr std::string encode_as(const std::string_view in_bytes)
+template<text::Enc OUTENC> constexpr std::string encode_as(const std::string_view in_bytes)
 {
     const auto [in_enc, bom_size] = detect_encoding_of(in_bytes);
-    if( in_enc==out_enc )
+    if( in_enc==OUTENC )
        {
         return std::string(in_bytes);
        }
@@ -441,19 +444,19 @@ template<text::Enc out_enc> constexpr std::string encode_as(const std::string_vi
        {using enum text::Enc;
 
         case UTF8:
-            return re_encode<UTF8,out_enc>(in_bytes);
+            return re_encode<UTF8,OUTENC>(in_bytes);
 
         case UTF16LE:
-            return re_encode<UTF16LE,out_enc>(in_bytes);
+            return re_encode<UTF16LE,OUTENC>(in_bytes);
 
         case UTF16BE:
-            return re_encode<UTF16BE,out_enc>(in_bytes);
+            return re_encode<UTF16BE,OUTENC>(in_bytes);
 
         case UTF32LE:
-            return re_encode<UTF32LE,out_enc>(in_bytes);
+            return re_encode<UTF32LE,OUTENC>(in_bytes);
 
         case UTF32BE:
-            return re_encode<UTF32BE,out_enc>(in_bytes);
+            return re_encode<UTF32BE,OUTENC>(in_bytes);
        }
     std::unreachable();
 }
@@ -461,51 +464,54 @@ template<text::Enc out_enc> constexpr std::string encode_as(const std::string_vi
 
 
     //-----------------------------------------------------------------------
-    //[[nodiscard]] bool is_identifier(const char32_t cp) noexcept
-    //   {
-    //    return std::isalnum(cp) || cp==U'_';
-    //   }
-
-    //-----------------------------------------------------------------------
-   //[[nodiscard]] bool is_numeric_literal(const char32_t cp) noexcept
-   //   {
-   //    return std::isdigit(cp) || cp==U'+' || cp==U'-' || cp==U'.' || cp==U'E';
-   //   }
-
-    //-----------------------------------------------------------------------
-    [[nodiscard]] bool is_space(const char32_t cp) noexcept
+    [[nodiscard]] constexpr bool is_space(const char32_t cp) noexcept
        {
-        return std::isspace(cp);
+        return cp==U' ' or cp==U'\n' or cp==U'\t' or cp==U'\r' or cp==U'\v' or cp==U'\f';
        }
 
     //-----------------------------------------------------------------------
-    [[nodiscard]] bool is_endline(const char32_t cp) noexcept
+    [[nodiscard]] constexpr bool is_blank(const char32_t cp) noexcept
+       {
+        return cp==U' ' or cp==U'\t' or cp==U'\r' or cp==U'\v' or cp==U'\f';
+       }
+
+    //-----------------------------------------------------------------------
+    [[nodiscard]] constexpr bool is_endline(const char32_t cp) noexcept
        {
         return cp==U'\n';
        }
 
     //-----------------------------------------------------------------------
-    [[nodiscard]] bool is_blank(const char32_t cp) noexcept
+    [[nodiscard]] constexpr bool is_digit(const char32_t cp) noexcept
        {
-        return std::isspace(cp) && cp!=U'\n';
+        return cp>=U'0' and cp<=U'9';
        }
 
     //-----------------------------------------------------------------------
-    [[nodiscard]] bool is_digit(const char32_t cp) noexcept
+    [[nodiscard]] constexpr bool is_punct(const char32_t cp) noexcept
        {
-        return std::isdigit(cp);
+        return (cp>U' ' and cp<U'0') or (cp>U'9' and cp<U'A') or (cp>U'Z' and cp<U'a') or (cp>U'z' and cp<'\x7F');
        }
 
+    //-----------------------------------------------------------------------
+    //[[nodiscard]] constexpr bool is_identifier(const char32_t cp) noexcept
+    //   {
+    //    return (cp>=U'a' and cp<=U'z') or (cp>=U'A' and cp<=U'Z') or cp==U'_';
+    //   }
 
 }//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 
 
+
+
 /////////////////////////////////////////////////////////////////////////////
 #ifdef TEST_UNITS ///////////////////////////////////////////////////////////
+#include <array>
 static ut::suite<"text:: "> text_tests = []
-{ ///////////////////////////////////////////////////////////////////////////
+{////////////////////////////////////////////////////////////////////////////
     using ut::expect;
+    using ut::that;
     using namespace std::literals; // "..."sv
     using enum text::Enc;
 
@@ -607,10 +613,27 @@ static ut::suite<"text:: "> text_tests = []
            }
        };
 
-    //ut::test("text::buffer_t") = []
-    //   {
-    //    //
-    //   };
+    ut::test("text::buffer_t") = []
+       {
+        text::buffer_t<text::Enc::UTF16LE> buf("\x61\x00\x62\x00\x63\x00"sv); // u"abc"
+        expect( buf.has_bytes() and buf.has_codepoint() and buf.byte_pos()==0 and buf.extract_codepoint()==U'a' );
+        expect( buf.has_bytes() and buf.has_codepoint() and buf.byte_pos()==2 and buf.extract_codepoint()==U'b' );
+        expect( buf.has_bytes() and buf.has_codepoint() and buf.byte_pos()==4 and buf.extract_codepoint()==U'c' );
+        expect( !buf.has_bytes() and !buf.has_codepoint() and buf.byte_pos()==6 );
+       };
+
+    ut::test("char types") = []
+       {
+        expect( that % !text::is_space(U'a')  and !text::is_endline(U'a')  and !text::is_blank(U'a')  and !text::is_digit(U'a') );
+        expect( that % !text::is_space(U'à')  and !text::is_endline(U'à')  and !text::is_blank(U'à')  and !text::is_digit(U'à') );
+        expect( that % !text::is_space(U'▙')  and !text::is_endline(U'▙')  and !text::is_blank(U'▙')  and !text::is_digit(U'▙') );
+        expect( that % !text::is_space(U'2')  and !text::is_endline(U'2')  and !text::is_blank(U'2')  and  text::is_digit(U'2') );
+        expect( that % !text::is_space(U'❸') and !text::is_endline(U'❸') and !text::is_blank(U'❸') and !text::is_digit(U'❸') );
+        expect( that %  text::is_space(U' ')  and !text::is_endline(U' ')  and  text::is_blank(U' ')  and !text::is_digit(U' ') );
+        expect( that %  text::is_space(U'\t') and !text::is_endline(U'\t') and  text::is_blank(U'\t') and !text::is_digit(U'\t') );
+        expect( that %  text::is_space(U'\r') and !text::is_endline(U'\r') and  text::is_blank(U'\r') and !text::is_digit(U'\r') );
+        expect( that %  text::is_space(U'\n') and  text::is_endline(U'\n') and !text::is_blank(U'\n') and !text::is_digit(U'\n') );
+       };
 
     ut::test("text::encode_as") = []
        {
@@ -687,5 +710,5 @@ static ut::suite<"text:: "> text_tests = []
        };
 
 };///////////////////////////////////////////////////////////////////////////
-#endif // TESTING ///////////////////////////////////////////////////////////
+#endif // TEST_UNITS ////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////

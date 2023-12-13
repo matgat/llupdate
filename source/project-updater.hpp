@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 //  ---------------------------------------------
 //  Updates the libraries in a LogicLab project
 //  ---------------------------------------------
