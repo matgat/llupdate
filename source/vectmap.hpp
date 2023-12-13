@@ -127,7 +127,7 @@ template<typename TKEY, typename TVAL> class vectmap final
         if( const_iterator it=find(key); it!=end() )
            {
             val = it->second;
-            erase(it);
+            it = erase(it);
            }
         return val;
        }
@@ -216,7 +216,7 @@ template<typename TKEY, typename TVAL> class vectmap final
 static ut::suite<"MG::vectmap<>"> vectmap_tests = []
 {////////////////////////////////////////////////////////////////////////////
     using namespace std::literals; // "..."sv
-    using namespace ut::literals; // "..."ul
+    using namespace ut::literals; // _ul
     using ut::expect;
     using ut::that;
     using ut::throws;
@@ -224,24 +224,24 @@ static ut::suite<"MG::vectmap<>"> vectmap_tests = []
     ut::test("MG::vectmap<std::string,std::string>") = []
        {
         MG::vectmap<std::string,std::string> v;
-        expect( that % v.is_empty() and v.size()==0 );
+        expect( that % v.is_empty() and v.size()==0u );
 
         // Inserting
         v.insert_or_assign("key1","val1");
-        expect( that % v.size()==1 and v.string()=="key1=val1"s );
+        expect( that % v.size()==1u and v.string()=="key1=val1"s );
 
         v.insert_if_missing("key2","old2");
-        expect( that % v.size()==2 and v.string()=="key1=val1,key2=old2"s );
+        expect( that % v.size()==2u and v.string()=="key1=val1,key2=old2"s );
 
         v.insert_unique("key3","val3");
-        expect( that % v.size()==3 and v.string()=="key1=val1,key2=old2,key3=val3"s );
+        expect( that % v.size()==3u and v.string()=="key1=val1,key2=old2,key3=val3"s );
 
         v.insert_if_missing("key2","val2");
-        expect( that % v.size()==3 and v.string()=="key1=val1,key2=old2,key3=val3"s ) << "shouldn't modify already existing key\n";
+        expect( that % v.size()==3u and v.string()=="key1=val1,key2=old2,key3=val3"s ) << "shouldn't modify already existing key\n";
 
         // Overwriting
         v.insert_or_assign("key2","val2");
-        expect( that % v.size()==3 and v.string()=="key1=val1,key2=val2,key3=val3"s ) << "should have modified key2\n";
+        expect( that % v.size()==3u and v.string()=="key1=val1,key2=val2,key3=val3"s ) << "should have modified key2\n";
         expect( throws<std::runtime_error>([v] { ut::mut(v).insert_unique("key1",""); })) << "should throw runtime_error inserting already existing key\n";
 
         // Accessing not existing
@@ -256,11 +256,11 @@ static ut::suite<"MG::vectmap<>"> vectmap_tests = []
 
         // Erasing
         v.erase("x");
-        expect( that % v.size()==3 and v.string()=="key1=val1,key2=val2,key3=val3"s ) << "erasing not existing key does nothing\n";
+        expect( that % v.size()==3u and v.string()=="key1=val1,key2=val2,key3=val3"s ) << "erasing not existing key does nothing\n";
         v.erase("key1");
-        expect( that % v.size()==2 and v.string()=="key2=val2,key3=val3"s ) << "erasing first key\n";
+        expect( that % v.size()==2u and v.string()=="key2=val2,key3=val3"s ) << "erasing first key\n";
         v.clear();
-        expect(that % v.is_empty() && v.size()==0) << "should be empty after clear\n";
+        expect(that % v.is_empty() && v.size()==0u) << "should be empty after clear\n";
        };
 
 

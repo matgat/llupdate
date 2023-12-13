@@ -50,7 +50,7 @@ template<text::Enc enc> class ParserBase
     fnotify_t m_on_notify_issue = default_notify;
 
  public:
-    ParserBase(const std::string_view bytes) noexcept
+    explicit ParserBase(const std::string_view bytes) noexcept
       : m_buf(bytes)
        {}
 
@@ -141,7 +141,7 @@ template<text::Enc enc> class ParserBase
        }
 
     //-----------------------------------------------------------------------
-    [[nodiscard]] constexpr bool eat(const char32_t cp) noexcept
+    [[nodiscard]] constexpr bool eat(const char32_t cp)
        {
         if( is(cp) )
            {
@@ -152,7 +152,7 @@ template<text::Enc enc> class ParserBase
        }
 
     //-----------------------------------------------------------------------
-    [[maybe_unused]] constexpr bool eat_endline() noexcept
+    [[maybe_unused]] constexpr bool eat_endline()
        {
         if( is_endline() )
            {
@@ -164,20 +164,20 @@ template<text::Enc enc> class ParserBase
 
     //-----------------------------------------------------------------------
     // Skip spaces except new line
-    constexpr void skip_blanks() noexcept
+    constexpr void skip_blanks()
        {
         while( is_blank() && get_next() ) ;
        }
 
     //-----------------------------------------------------------------------
     // Skip any space, including new line
-    constexpr void skip_any_space() noexcept // aka skip_empty_lines()
+    constexpr void skip_any_space() // aka skip_empty_lines()
        {
         while( is_space() && get_next() ) ;
        }
 
     //-----------------------------------------------------------------------
-    constexpr void skip_line() noexcept
+    constexpr void skip_line()
        {
         while( !is_endline() && get_next() ) ;
         [[maybe_unused]] const bool has_next = get_next(); // Skip also line end character
@@ -326,18 +326,18 @@ static ut::suite<"MG::ParserBase"> ParserBase_tests = []
         parser.set_on_notify_issue(notify_sink);
 
         expect( parser.get_next() && parser.eat(U'a') and parser.eat(U'=') );
-        expect( that % parser.extract_index()==1234 );
-        expect( parser.is(U'm') and parser.curr_line()==1 );
+        expect( that % parser.extract_index()==1234u );
+        expect( parser.is(U'm') and parser.curr_line()==1u );
         parser.skip_line();
 
         expect( parser.eat(U'b') and parser.eat(U'=') and parser.curr_line()==2 );
         expect( throws<MG::parse_error>([&parser] { [[maybe_unused]] auto n = parser.extract_index(); }) ) << "invalid index should throw MG::parse_error\n";
         expect( parser.eat(U'h') );
-        expect( that % parser.extract_index()==1 );
-        expect( parser.eat_endline() and parser.curr_line()==3 );
+        expect( that % parser.extract_index()==1u );
+        expect( parser.eat_endline() and parser.curr_line()==3u );
 
         expect( parser.eat(U'c') and parser.eat(U'=') );
-        expect( that % parser.extract_index()==12 );
+        expect( that % parser.extract_index()==12u );
        };
 
 };///////////////////////////////////////////////////////////////////////////
