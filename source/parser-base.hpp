@@ -87,7 +87,7 @@ template<text::Enc enc> class ParserBase
 
     //-----------------------------------------------------------------------
     // Extract next codepoint from buffer
-    [[nodiscard]] constexpr bool get_next()
+    [[nodiscard]] constexpr bool get_next() noexcept
        {
         if( m_buf.has_codepoint() ) [[likely]]
            {
@@ -99,7 +99,8 @@ template<text::Enc enc> class ParserBase
            {// Truncated codepoint!
             m_curr_codepoint = text::err_codepoint;
             m_buf.set_as_depleted();
-            throw create_parse_error("Truncated codepoint");
+            notify_issue("! Truncated codepoint");
+            return true;
            }
         m_curr_codepoint = text::null_codepoint;
         return false;
@@ -141,7 +142,7 @@ template<text::Enc enc> class ParserBase
        }
 
     //-----------------------------------------------------------------------
-    [[nodiscard]] constexpr bool eat(const char32_t cp)
+    [[nodiscard]] constexpr bool eat(const char32_t cp) noexcept
        {
         if( is(cp) )
            {
@@ -152,7 +153,7 @@ template<text::Enc enc> class ParserBase
        }
 
     //-----------------------------------------------------------------------
-    [[maybe_unused]] constexpr bool eat_endline()
+    [[maybe_unused]] constexpr bool eat_endline() noexcept
        {
         if( is_endline() )
            {
@@ -164,20 +165,20 @@ template<text::Enc enc> class ParserBase
 
     //-----------------------------------------------------------------------
     // Skip spaces except new line
-    constexpr void skip_blanks()
+    constexpr void skip_blanks() noexcept
        {
         while( is_blank() && get_next() ) ;
        }
 
     //-----------------------------------------------------------------------
     // Skip any space, including new line
-    constexpr void skip_any_space() // aka skip_empty_lines()
+    constexpr void skip_any_space() noexcept // aka skip_empty_lines()
        {
         while( is_space() && get_next() ) ;
        }
 
     //-----------------------------------------------------------------------
-    constexpr void skip_line()
+    constexpr void skip_line() noexcept
        {
         while( !is_endline() && get_next() ) ;
         [[maybe_unused]] const bool has_next = get_next(); // Skip also line end character
@@ -208,11 +209,148 @@ template<text::Enc enc> class ParserBase
         constexpr std::size_t base = 10u;
         while( get_next() && is_digit() )
            {
-            //assert( result < std::numeric_limits<std::size_t>::max/base ); // Check overflows
+            //assert( result < (std::numeric_limits<std::size_t>::max - (curr_codepoint()-U'0')) / base ); // Check overflows
             result = (base*result) + (curr_codepoint()-U'0');
            }
         return result;
        }
+
+/*
+
+    //-----------------------------------------------------------------------
+    [[nodiscard]] bool eat(const std::u32string_view sv) noexcept
+       {
+        const std::size_t i_end = i+sv.size();
+        if( i_end<=siz && sv==std::string_view(buf+i,sv.size()) )
+           {
+            i = i_end;
+            return true;
+           }
+        return false;
+       }
+
+    //-----------------------------------------------------------------------
+    // Collect a delimited string (same line, excluding delims)
+    MG::string_view collect_inner_same_line(const char ch_open, const char ch_close, const char chEscape)
+       {
+        assertm( i<siz && buf[i]==ch_open, "expecting initial delim" );
+        ++i; // Skip ch_open
+        const std::size_t i_start = i;
+        while( i<siz )
+           {
+            if( buf[i]==chEscape )
+               {// Do not check if next char is ch_close
+                ++i; // Collect chEscape
+                if(i>=siz) break; // No more data!
+               }
+            else if( buf[i]==ch_close )
+               {
+                ++i; // Skip ch_close
+                return MG::string_view(buf+i_start, i-i_start-1);
+               }
+            else if( buf[i]=='\n' )
+               {
+                break;
+               }
+            ++i;
+           }
+        i = i_start; // Restore position (strong guarantee)
+        throw parse_error( String().sprintf("Unclosed string (\'%c\' expected)",ch_close), m_filepath, line, i_start);
+       }
+
+    //-----------------------------------------------------------------------
+    [[nodiscard]] std::string_view collect_until( const char32_t ch )
+       {
+        const std::size_t i_start = i;
+        std::size_t i_end = i_start; // Index past last char not space
+        while( i<siz )
+           {
+            if( is(ch) )
+               {
+                break;
+               }
+            else if( buf[i]=='\n' )
+               {
+                ++line;
+                ++i;
+               }
+            else if( !is_space() )
+               {
+                i_end = ++i;
+               }
+            else
+               {
+                ++i;
+               }
+           }
+        return std::string_view(buf+i_start, i_end-i_start);
+       }
+
+    //-----------------------------------------------------------------------
+    [[nodiscard]] std::string_view collect_until(const char ch1, const char ch2, const char ch3)
+       {
+        const std::size_t line_start = line;
+        const std::size_t i_start = i;
+        const std::size_t i_max = siz-2; // Ultimo indice utile
+        std::size_t i_end = i_start; // Index past last char not space
+
+        while( i<i_max )
+           {
+            if( buf[i]==ch1 && buf[i+1]==ch2 && buf[i+2]==ch3 )
+               {
+                i += 3; // Eat closing sequence
+                return std::string_view(buf+i_start, i_end-i_start);
+               }
+            else if( buf[i]=='\n' )
+               {
+                ++line;
+                ++i;
+               }
+            else if( !is_space() )
+               {
+                i_end = ++i;
+               }
+            else
+               {
+                ++i;
+               }
+           }
+        throw MG::parse_error( fmt::format("Unclosed block (%c%c%c expected)",ch1,ch2,ch3), file_path(), line_start, i_start);
+       }
+
+
+    //-----------------------------------------------------------------------
+    [[nodiscard]] std::string_view collect_until(const char ch1, const char ch2)
+       {
+        const std::size_t line_start = line;
+        const std::size_t i_start = i;
+        std::size_t i_end = i_start; // Index past last char not space
+
+        while( i<i_last )
+           {
+            if( buf[i]==ch1 && buf[i+1]==ch2 )
+               {
+                i += 2; // Eat closing sequence
+                return std::string_view(buf+i_start, i_end-i_start);
+               }
+            else if( buf[i]=='\n' )
+               {
+                ++line;
+                ++i;
+               }
+            else if( !is_space() )
+               {
+                i_end = ++i;
+               }
+            else
+               {
+                ++i;
+               }
+           }
+        throw MG::parse_error( fmt::format("Unclosed block (%c%c expected)",ch1,ch2), file_path(), line_start, i_start);
+       }
+*/
+
 };
 
 }//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -225,6 +363,7 @@ template<text::Enc enc> class ParserBase
 static ut::suite<"MG::ParserBase"> ParserBase_tests = []
 {////////////////////////////////////////////////////////////////////////////
     using namespace std::literals; // "..."sv
+    //using namespace ut::literals; // _ul
     using ut::expect;
     using ut::that;
     using ut::throws;

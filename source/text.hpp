@@ -410,23 +410,46 @@ template<Enc ENC> class buffer_t final
 // const std::string out_bytes = text::re_encode<UTF16LE,UTF8>(in_bytes);
 template<text::Enc INENC,text::Enc OUTENC> constexpr std::string re_encode(const std::string_view in_bytes)
 {
-    std::string out_bytes;
-    out_bytes.reserve( in_bytes.size() );
-
-    text::buffer_t<INENC> text_buf(in_bytes);
-    while( text_buf.has_codepoint() )
+    if constexpr( INENC==OUTENC )
        {
-        const char32_t codepoint = text_buf.extract_codepoint();
-        append_codepoint<OUTENC>(codepoint, out_bytes);
+        return std::string(in_bytes);
        }
+    else
+       {
+        std::string out_bytes;
 
-    // Detect truncated
-    if( text_buf.has_bytes() )
-       {// Truncated codepoint!
-        append_codepoint<OUTENC>(err_codepoint, out_bytes);
+        using enum text::Enc;
+        if constexpr( INENC==UTF8 and (OUTENC==UTF32BE or OUTENC==UTF32LE) )
+           {
+            out_bytes.reserve( 4 * in_bytes.size() );
+           }
+        else if constexpr( (INENC==UTF16BE or INENC==UTF16LE) and (OUTENC==UTF32BE or OUTENC==UTF32LE) )
+           {
+            out_bytes.reserve( 2 * in_bytes.size() );
+           }
+        else if constexpr( INENC==UTF8 and (OUTENC==UTF16BE or OUTENC==UTF16LE) )
+           {
+            out_bytes.reserve( 2 * in_bytes.size() );
+           }
+        else
+           {
+            out_bytes.reserve( in_bytes.size() );
+           }
+
+        text::buffer_t<INENC> text_buf(in_bytes);
+        while( text_buf.has_codepoint() )
+           {
+            append_codepoint<OUTENC>(text_buf.extract_codepoint(), out_bytes);
+           }
+
+        // Detect truncated
+        if( text_buf.has_bytes() )
+           {// Truncated codepoint!
+            append_codepoint<OUTENC>(err_codepoint, out_bytes);
+           }
+
+        return out_bytes;
        }
-
-    return out_bytes;
 }
 
 
@@ -494,10 +517,10 @@ template<text::Enc OUTENC> constexpr std::string encode_as(const std::string_vie
        }
 
     //-----------------------------------------------------------------------
-    //[[nodiscard]] constexpr bool is_identifier(const char32_t cp) noexcept
-    //   {
-    //    return (cp>=U'a' and cp<=U'z') or (cp>=U'A' and cp<=U'Z') or cp==U'_';
-    //   }
+    [[nodiscard]] constexpr bool is_alpha(const char32_t cp) noexcept
+       {
+        return (cp>=U'a' and cp<=U'z') or (cp>=U'A' and cp<=U'Z');
+       }
 
 }//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
@@ -624,15 +647,15 @@ static ut::suite<"text:: "> text_tests = []
 
     ut::test("char types") = []
        {
-        expect( that % !text::is_space(U'a')  and !text::is_endline(U'a')  and !text::is_blank(U'a')  and !text::is_digit(U'a') );
-        expect( that % !text::is_space(U'à')  and !text::is_endline(U'à')  and !text::is_blank(U'à')  and !text::is_digit(U'à') );
-        expect( that % !text::is_space(U'▙')  and !text::is_endline(U'▙')  and !text::is_blank(U'▙')  and !text::is_digit(U'▙') );
-        expect( that % !text::is_space(U'2')  and !text::is_endline(U'2')  and !text::is_blank(U'2')  and  text::is_digit(U'2') );
-        expect( that % !text::is_space(U'❸') and !text::is_endline(U'❸') and !text::is_blank(U'❸') and !text::is_digit(U'❸') );
-        expect( that %  text::is_space(U' ')  and !text::is_endline(U' ')  and  text::is_blank(U' ')  and !text::is_digit(U' ') );
-        expect( that %  text::is_space(U'\t') and !text::is_endline(U'\t') and  text::is_blank(U'\t') and !text::is_digit(U'\t') );
-        expect( that %  text::is_space(U'\r') and !text::is_endline(U'\r') and  text::is_blank(U'\r') and !text::is_digit(U'\r') );
-        expect( that %  text::is_space(U'\n') and  text::is_endline(U'\n') and !text::is_blank(U'\n') and !text::is_digit(U'\n') );
+        expect( that % !text::is_space(U'a')  and !text::is_endline(U'a')  and !text::is_blank(U'a')  and !text::is_digit(U'a')  and  text::is_alpha(U'a') );
+        expect( that % !text::is_space(U'à')  and !text::is_endline(U'à')  and !text::is_blank(U'à')  and !text::is_digit(U'à')  and !text::is_alpha(U'à') );
+        expect( that % !text::is_space(U'2')  and !text::is_endline(U'2')  and !text::is_blank(U'2')  and  text::is_digit(U'2')  and !text::is_alpha(U'2') );
+        expect( that %  text::is_space(U' ')  and !text::is_endline(U' ')  and  text::is_blank(U' ')  and !text::is_digit(U' ')  and !text::is_alpha(U' ') );
+        expect( that %  text::is_space(U'\t') and !text::is_endline(U'\t') and  text::is_blank(U'\t') and !text::is_digit(U'\t') and !text::is_alpha(U'\t') );
+        expect( that %  text::is_space(U'\r') and !text::is_endline(U'\r') and  text::is_blank(U'\r') and !text::is_digit(U'\r') and !text::is_alpha(U'\r') );
+        expect( that %  text::is_space(U'\n') and  text::is_endline(U'\n') and !text::is_blank(U'\n') and !text::is_digit(U'\n') and !text::is_alpha(U'\n') );
+        expect( that % !text::is_space(U'▙')  and !text::is_endline(U'▙')  and !text::is_blank(U'▙')  and !text::is_digit(U'▙')  and !text::is_alpha(U'▙') );
+        expect( that % !text::is_space(U'❸') and !text::is_endline(U'❸') and !text::is_blank(U'❸') and !text::is_digit(U'❸') and !text::is_alpha(U'❸') );
        };
 
     ut::test("text::encode_as") = []

@@ -45,6 +45,157 @@ static ut::suite<"xml::Parser"> XmlParser_tests = []
         //xml::Parser<UTF8> parser{""sv};
        };
 
+/*
+    //-----------------------------------------------------------------------
+    void test_generic(const char* const title)
+       {
+        log(fmt::format("  -- {} --",title) );
+        const std::string_view buf = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                              "<!DOCTYPE doctype [\n"
+                              "<!ELEMENT root (child+)>\n"
+                              "]>\n"
+                              "<!-- comment -->\n"
+                              "<tag1/><tag2 attr1=\"1\" attr2=2 attr3/>\n"
+                              "<tag3>blah</tag3>\n"
+                              "< nms:tag4 \n attr1=\"1&lt;2\" \n attr2=\"2\" \n >blah</ nms:tag4 >\n"
+                              "  some text\n"
+                              "<![CDATA[\n"
+                              "  Some <>not parsed<> text\n"
+                              "]]>\n"
+                              "<root>\n"
+                              "    <child key1=123 key2=\"quoted value\"/>\n"
+                              "    <child key1 key2=\"blah blah\">\n"
+                              "        &apos;text&apos;\n"
+                              "        <subchild>\n"
+                              "            text text text\n"
+                              "            text text text\n"
+                              "        </subchild>\n"
+                              "    </child>\n"
+                              "</root>\n";
+
+        xml::Parser parser(title, buf, &log);
+        parser.set_fussy();
+        parser.options().set_enable_comment_events();
+
+        std::size_t k = 0;
+        while( const xml::ParserEvent& event = parser.next_event() )
+           {
+            switch( k )
+               {
+                case  0: TEST_EXPECTM(event.is_proc_instr(), event.string()); break;
+                case  1: TEST_EXPECTM(event.is_special_block(), event.string()); break;
+                case  2: TEST_EXPECTM(event.is_comment(), event.string()); break;
+                case  3: TEST_EXPECTM(event.is_open_tag("tag1") && event.attributes().size()==0, event.string()); break;
+                case  4: TEST_EXPECTM(event.is_close_tag("tag1"), event.string()); break;
+                case  5: TEST_EXPECTM(event.is_open_tag("tag2") && event.attributes().size()==3, event.string()); break;
+                case  6: TEST_EXPECTM(event.is_close_tag("tag2"), event.string()); break;
+                case  7: TEST_EXPECTM(event.is_open_tag("tag3") && event.attributes().size()==0, event.string()); break;
+                case  8: TEST_EXPECTM(event.is_text(), event.string()); break;
+                case  9: TEST_EXPECTM(event.is_close_tag("tag3"), event.string()); break;
+                case 10: TEST_EXPECTM(event.is_open_tag("nms:tag4") && event.attributes().size()==2, event.string()); break;
+                case 11: TEST_EXPECTM(event.is_text(), event.string()); break;
+                case 12: TEST_EXPECTM(event.is_close_tag("nms:tag4"), event.string()); break;
+                case 13: TEST_EXPECTM(event.is_text(), event.string()); break;
+                case 14: TEST_EXPECTM(event.is_text(), event.string()); break;
+                case 15: TEST_EXPECTM(event.is_open_tag("root") && event.attributes().size()==0, event.string()); break;
+                case 16: TEST_EXPECTM(event.is_open_tag("child") && event.attributes().size()==2, event.string()); break;
+                case 17: TEST_EXPECTM(event.is_close_tag("child"), event.string()); break;
+                case 18: TEST_EXPECTM(event.is_open_tag("child") && event.attributes().size()==2, event.string()); break;
+                case 19: TEST_EXPECTM(event.is_text(), event.string()); break;
+                case 20: TEST_EXPECTM(event.is_open_tag("subchild") && event.attributes().size()==0, event.string()); break;
+                case 21: TEST_EXPECTM(event.is_text(), event.string()); break;
+                case 22: TEST_EXPECTM(event.is_close_tag("subchild"), event.string()); break;
+                case 23: TEST_EXPECTM(event.is_close_tag("child"), event.string()); break;
+                case 24: TEST_EXPECTM(event.is_close_tag("root"), event.string()); break;
+
+                default: err("Unexpected event " + event.string());
+               }
+            ++k;
+           }
+        TEST_EXPECT(k==25);
+       }
+
+    //-----------------------------------------------------------------------
+    void test_bad(const char* const title)
+       {
+        log(fmt::format("  -- {} --",title) );
+        std::string_view buf = "<!--\n\n\n\n";
+        xml::Parser parser(title, buf, &log);
+        TEST_EXPECT_EXCEPTION( parser.next_event() );
+       }
+
+    //-----------------------------------------------------------------------
+    void test_interface(const char* const title)
+       {
+        log(fmt::format("  -- {} --",title) );
+        const std::string_view buf = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                              "<?xml-stylesheet type=\"text/xsl\" href=\"Interface2XHTML.xsl\"?>\n"
+                              "<!--\n"
+                              "    Dizionario interfaccia unificata macchine Macotec\n"
+                              "    ©2017-2022 gattanini@macotec.it\n"
+                              "-->\n"
+                              "<interface version=\"2022-09-06\"\n"
+                              "           name=\"MacoLayer\"\n"
+                              "           xmlns=\"http://www.macotec.it\">\n"
+                              "\n"
+                              "<!-- +------------------------------------------------------------------+\n"
+                              "     ¦ Statistics and maintenance                                       ¦\n"
+                              "     +------------------------------------------------------------------+ -->\n"
+                              "<group name=\"statistics\">\n"
+                              "\n"
+                              "    <res    id=\"sheets-done\" tags=\"statistics,counter,sheets,done\" access=\"r\"\n"
+                              "            type=\"int\">\n"
+                              "        <text lang=\"en\" label=\"Done sheets\">Processed sheets count</text>\n"
+                              "        <text lang=\"it\" label=\"Lastre lavorate\">Contatore lastre lavorate</text>\n"
+                              "    </res>\n"
+                              "\n"
+                              "    <res    id=\"buffer-width\" tags=\"settings,machine,modules,size,width,buffer\" access=\"r\"\n"
+                              "            type=\"double\" quantity=\"length\" unit=\"mm\" unit-coeff=\"0.001\"\n"
+                              "            range=\"0:6000\" gran=\"0.1\" default=\"2400\">\n"
+                              "        <text lang=\"en\" label=\"Buffer width\">Buffer longitudinal size</text>\n"
+                              "        <text lang=\"it\" label=\"Largh polmone\">Larghezza del polmone</text>\n"
+                              "    </res>\n"
+                              "\n"
+                              "</group> <!-- statistics -->\n"
+                              "\n"
+                              "</interface>\n";
+        xml::Parser parser(title, buf, &log);
+
+        std::size_t k = 0;
+        while( const xml::ParserEvent& event = parser.next_event() )
+           {
+            switch( k )
+               {
+                case  0: TEST_EXPECTM(event.is_proc_instr(), event.string()); break;
+                case  1: TEST_EXPECTM(event.is_proc_instr(), event.string()); break;
+                case  2: TEST_EXPECTM(event.is_open_tag("interface") && event.attributes().size()==3, event.string()); break;
+                case  3: TEST_EXPECTM(event.is_open_tag("group") && event.attributes().get_value_of("name")=="statistics", event.string()); break;
+                case  4: TEST_EXPECTM(event.is_open_tag("res") && event.attributes().get_value_of("id")=="sheets-done", event.string()); break;
+                case  5: TEST_EXPECTM(event.is_open_tag("text") && event.attributes().get_value_of("lang")=="en", event.string()); break;
+                case  6: TEST_EXPECTM(event.is_text(), event.string()); break;
+                case  7: TEST_EXPECTM(event.is_close_tag("text"), event.string()); break;
+                case  8: TEST_EXPECTM(event.is_open_tag("text") && event.attributes().get_value_of("lang")=="it", event.string()); break;
+                case  9: TEST_EXPECTM(event.is_text(), event.string()); break;
+                case 10: TEST_EXPECTM(event.is_close_tag("text"), event.string()); break;
+                case 11: TEST_EXPECTM(event.is_close_tag("res"), event.string()); break;
+                case 12: TEST_EXPECTM(event.is_open_tag("res") && event.attributes().get_value_of("id")=="buffer-width", event.string()); break;
+                case 13: TEST_EXPECTM(event.is_open_tag("text") && event.attributes().get_value_of("lang")=="en", event.string()); break;
+                case 14: TEST_EXPECTM(event.is_text(), event.string()); break;
+                case 15: TEST_EXPECTM(event.is_close_tag("text"), event.string()); break;
+                case 16: TEST_EXPECTM(event.is_open_tag("text") && event.attributes().get_value_of("lang")=="it", event.string()); break;
+                case 17: TEST_EXPECTM(event.is_text(), event.string()); break;
+                case 18: TEST_EXPECTM(event.is_close_tag("text"), event.string()); break;
+                case 19: TEST_EXPECTM(event.is_close_tag("res"), event.string()); break;
+                case 20: TEST_EXPECTM(event.is_close_tag("group"), event.string()); break;
+                case 21: TEST_EXPECTM(event.is_close_tag("interface"), event.string()); break;
+                default: err("Unexpected event " + event.string());
+               }
+            ++k;
+           }
+        TEST_EXPECT(k==22);
+       }
+*/
+       
 };///////////////////////////////////////////////////////////////////////////
 #endif // TEST_UNITS ////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////

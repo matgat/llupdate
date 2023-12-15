@@ -67,7 +67,7 @@ On Windows use the latest Microsoft Visual Studio Community.
 From the command line, something like:
 
 ```bat
-> msbuild .msvc/llupdate.vcxproj -t:llupdate -p:Configuration=Release
+> msbuild .msvc/llupdate.vcxproj -t:Rebuild -p:Configuration=Release -p:Platform=x64
 ```
 
 This project depends on `{fmt}` library, use `vcpkg` to install it:

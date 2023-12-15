@@ -132,6 +132,22 @@ template<typename TKEY, typename TVAL> class vectmap final
         return val;
        }
 
+    //#include <concepts>
+    //template <typename T> concept condition = requires(T t) { { t(const_iterator{}) } -> std::same_as<bool>; };
+    constexpr void erase_if(auto condition)
+       {
+        for( const_iterator it=begin(); it!=end(); )
+           {
+            if( condition(it) )
+               {
+                it = erase(it);
+               }
+            else
+               {
+                ++it;
+               }
+           }
+       }
 
     constexpr void erase(TKEY const& key)
        {
@@ -216,7 +232,7 @@ template<typename TKEY, typename TVAL> class vectmap final
 static ut::suite<"MG::vectmap<>"> vectmap_tests = []
 {////////////////////////////////////////////////////////////////////////////
     using namespace std::literals; // "..."sv
-    using namespace ut::literals; // _ul
+    //using namespace ut::literals; // _ul
     using ut::expect;
     using ut::that;
     using ut::throws;
@@ -275,17 +291,18 @@ static ut::suite<"MG::vectmap<>"> vectmap_tests = []
         expect( that % v.string()=="1=1,2=2,3=3,4=4,5=5"s );
 
         // Erase odd values
-        for( MG::vectmap<int,int>::const_iterator it=v.begin(); it!=v.end(); )
-           {
-            if( it->second % 2 )
-               {
-                it = v.erase(it);
-               }
-            else
-               {
-                ++it;
-               }
-           }
+        v.erase_if( [](MG::vectmap<int,int>::const_iterator it) constexpr -> bool { return it->second % 2; } );
+        //for( MG::vectmap<int,int>::const_iterator it=v.begin(); it!=v.end(); )
+        //   {
+        //    if( it->second % 2 )
+        //       {
+        //        it = v.erase(it);
+        //       }
+        //    else
+        //       {
+        //        ++it;
+        //       }
+        //   }
 
         expect( that % v.string()=="2=2,4=4"s );
        };
