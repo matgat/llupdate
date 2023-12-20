@@ -114,7 +114,7 @@ class ParserEvent final
 
 
 /////////////////////////////////////////////////////////////////////////////
-template<text::Enc enc> 
+template<text::Enc enc>
 class Parser final : public MG::ParserBase<enc>
 {
  private:
@@ -134,7 +134,7 @@ class Parser final : public MG::ParserBase<enc>
 
  public:
     explicit Parser(const std::string_view bytes) noexcept
-      : MG::ParserBase(bytes)
+      : MG::ParserBase<enc>(bytes)
        {}
 
     [[nodiscard]] constexpr Options const& options() const noexcept { return m_Options; }
@@ -181,8 +181,8 @@ class Parser final : public MG::ParserBase<enc>
         //        throw MG::parse_error(e.Message, m_filepath, line, i<=i_last ? i : i_last);
         //       }
         //   }
-        //
-        //return m_event;
+
+        return m_event;
        }
 
 

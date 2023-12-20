@@ -18,23 +18,23 @@ namespace text
         //-------------------------------------------------------------------
         [[nodiscard]] constexpr std::uint16_t combine_chars(const char h, const char l) noexcept
            {
-            return (static_cast<unsigned char>(h) << 8) |
+            return (static_cast<unsigned char>(h) << 0x8) |
                     static_cast<unsigned char>(l);
            }
 
         //-------------------------------------------------------------------
         [[nodiscard]] constexpr std::uint32_t combine_chars(const char hh, const char hl, const char lh, const char ll) noexcept
            {
-            return (static_cast<unsigned char>(hh) << 24) |
-                   (static_cast<unsigned char>(hl) << 16) |
-                   (static_cast<unsigned char>(lh) << 8) |
+            return (static_cast<unsigned char>(hh) << 0x18) |
+                   (static_cast<unsigned char>(hl) << 0x10) |
+                   (static_cast<unsigned char>(lh) << 0x8) |
                     static_cast<unsigned char>(ll);
            }
 
         //-------------------------------------------------------------------
         [[nodiscard]] constexpr char high_byte_of(const std::uint16_t word) noexcept
            {
-            return static_cast<char>((word >> 8) & 0xFF);
+            return static_cast<char>((word >> 0x8) & 0xFF);
            }
 
         //-------------------------------------------------------------------
@@ -46,19 +46,19 @@ namespace text
         //-------------------------------------------------------------------
         [[nodiscard]] constexpr char hh_byte_of(const std::uint32_t dword) noexcept
            {
-            return static_cast<char>((dword >> 24) & 0xFF);
+            return static_cast<char>((dword >> 0x18) & 0xFF);
            }
 
         //-------------------------------------------------------------------
         [[nodiscard]] constexpr char hl_byte_of(const std::uint32_t dword) noexcept
            {
-            return static_cast<char>((dword >> 16) & 0xFF);
+            return static_cast<char>((dword >> 0x10) & 0xFF);
            }
 
         //-------------------------------------------------------------------
         [[nodiscard]] constexpr char lh_byte_of(const std::uint32_t dword) noexcept
            {
-            return static_cast<char>((dword >> 8) & 0xFF);
+            return static_cast<char>((dword >> 0x8) & 0xFF);
            }
 
         //-------------------------------------------------------------------
@@ -218,7 +218,7 @@ template<bool LE> constexpr char32_t extract_next_codepoint_from_utf16(const std
 
     // Ok, I have the two valid codeunits
     pos += 2;
-    return 0x10000 + ((codeunit1 - 0xD800) << 10) + (codeunit2 - 0xDC00);
+    return 0x10000 + ((codeunit1 - 0xD800) << 0xA) + (codeunit2 - 0xDC00);
 }
 template<> constexpr char32_t extract_codepoint<Enc::UTF16LE>(const std::string_view bytes, std::size_t& pos) noexcept
 {
@@ -547,7 +547,7 @@ constexpr std::string encode_as(const std::string_view in_bytes)
 
     return u32str;
 }
-[[nodiscard]] constexpr std::u32string to_utf32(const std::u8string_view utf8str)
+[[nodiscard]] /*constexpr*/ std::u32string to_utf32(const std::u8string_view utf8str)
 {
     return to_utf32( std::string_view(reinterpret_cast<const char*>(utf8str.data()), utf8str.size()) );
 }
@@ -598,7 +598,7 @@ constexpr std::string encode_as(const std::string_view in_bytes)
        {
         return cp==CP;
        }
-       
+
     //-----------------------------------------------------------------------
     template<char32_t... cps>
     [[nodiscard]] constexpr bool is_any_of(const char32_t cp)
