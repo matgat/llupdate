@@ -79,9 +79,7 @@
     <ClCompile Include="..\test\test.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="llupdate.vcxproj">
-      <Project>{cc711354-0868-4333-99e7-d20def74ba83}</Project>
-    </ProjectReference>
+    <ClInclude Include="..\source\parser-base.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

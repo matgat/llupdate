@@ -19,6 +19,12 @@ export import std;
 #endif
 
 #include <version>
+#if defined(_MSC_VER)
+  #pragma push_macro("min")
+  #pragma push_macro("max")
+  #undef min
+  #undef max
+#endif
 // Before libc++ 17 had experimental support for format and it required a
 // special build flag. Currently libc++ has not implemented all C++20 chrono
 // improvements. Therefore doesn't define __cpp_lib_format, instead query the
@@ -51,7 +57,7 @@ export import std;
 #elif not defined(__cpp_static_assert)
 #error "[Boost::ext].UT requires support for static assert";
 #else
-#define BOOST_UT_VERSION 2'0'0
+#define BOOST_UT_VERSION 2'0'1
 
 #if defined(__has_builtin) and defined(__GNUC__) and (__GNUC__ < 10) and \
     not defined(__clang__)
@@ -103,7 +109,7 @@ struct _unique_name_for_auto_detect_prefix_and_suffix_lenght_0123456789_struct {
 };
 
 BOOST_UT_EXPORT
-namespace boost::inline ext::ut::inline v2_0_0 {
+namespace boost::inline ext::ut::inline v2_0_1 {
 namespace utility {
 template <class>
 class function;
@@ -3270,7 +3276,7 @@ using operators::operator not;
 using operators::operator|;
 using operators::operator/;
 using operators::operator>>;
-}  // namespace boost::inline ext::ut::inline v2_0_0
+}  // namespace boost::inline ext::ut::inline v2_0_1
 
 #if (defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER)) && \
     !defined(__EMSCRIPTEN__)
@@ -3281,6 +3287,11 @@ __attribute__((constructor)) inline void cmd_line_args(int argc,
 }
 #else
 // For MSVC, largc/largv are initialized with __argc/__argv
+#endif
+
+#if defined(_MSC_VER)
+  #pragma pop_macro("min")
+  #pragma pop_macro("max")
 #endif
 
 #endif
