@@ -66,7 +66,7 @@ template<a_basic_string TKEY, typename TVAL> class string_map final
            {
             return it->second; // Already present, do nothing
            }
-        return append(std::move(key), std::move(val));
+        return append( item_type{std::move(key), std::move(val)} );
        }
 
     [[maybe_unused]] constexpr value_type& insert_or_assign(key_type&& key, value_type&& val)
@@ -75,7 +75,7 @@ template<a_basic_string TKEY, typename TVAL> class string_map final
            {
             return it->second = val; // Already present, overwrite
            }
-        return append(std::move(key), std::move(val));
+        return append( item_type{std::move(key), std::move(val)} );
        }
 
     [[maybe_unused]] constexpr value_type& insert_unique(key_type&& key, value_type&& val)
@@ -84,12 +84,13 @@ template<a_basic_string TKEY, typename TVAL> class string_map final
            {
             throw std::runtime_error("key already present in string_map");
            }
-        return append(std::move(key), std::move(val));
+        return append( item_type{std::move(key), std::move(val)} );
        }
 
-    [[maybe_unused]] constexpr value_type& append(key_type&& key, value_type&& val)
+    [[maybe_unused]] constexpr value_type& append(item_type&& item)
        {
-        return m_v.insert(m_v.end(), item_type(std::move(key), std::move(val)))->second;
+        m_v.push_back( std::move(item) );
+        return m_v.back().second;
        }
 
 

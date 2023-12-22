@@ -24,17 +24,18 @@ class ParserEvent final
 
  private:
     std::u32string m_value;
+    std::size_t m_start_byte_offset = 0;
     Attributes m_attributes;
     enum class type : char
-      {
-       COMMENT =0, // <!-- ... -->
-       TEXT, // >...<
-       OPENTAG, // <tag attr1 attr2=val>
-       CLOSETAG, // </tag> or />
-       PROCINST, // <? ... ?>
-       SPECIALBLOCK, // <!xxx ... !>
-       NONE
-      } m_type = type::NONE;
+       {
+        NONE = 0
+       ,COMMENT // <!-- ... -->
+       ,TEXT // >...<
+       ,OPENTAG // <tag attr1 attr2=val>
+       ,CLOSETAG // </tag> or />
+       ,PROCINST // <? ... ?>
+       ,SPECIALBLOCK // <!xxx ... !>
+       } m_type = type::NONE;
 
  public:
     constexpr void set_as_none() noexcept
@@ -50,11 +51,23 @@ class ParserEvent final
         m_value = std::move(cmt);
         m_attributes.clear();
        }
+    constexpr void set_as_comment() noexcept
+       {
+        m_type = type::COMMENT;
+        m_value = {};
+        m_attributes.clear();
+       }
 
     constexpr void set_as_text(std::u32string&& txt) noexcept
        {
         m_type = type::TEXT;
         m_value = std::move(txt);
+        m_attributes.clear();
+       }
+    constexpr void set_as_text() noexcept
+       {
+        m_type = type::TEXT;
+        m_value = {};
         m_attributes.clear();
        }
 
@@ -69,10 +82,11 @@ class ParserEvent final
            }
        }
 
-    constexpr void set_as_close_tag(std::u32string&& nam)
+    template<typename T>
+    constexpr void set_as_close_tag(T&& nam)
        {
         m_type = type::CLOSETAG;
-        m_value = std::move(nam);
+        m_value = std::forward<T>(nam);
         m_attributes.clear();
         if( m_value.empty() )
            {
@@ -102,8 +116,13 @@ class ParserEvent final
     [[nodiscard]] constexpr bool is_proc_instr() const noexcept { return m_type==type::PROCINST; }
     [[nodiscard]] constexpr bool is_special_block() const noexcept { return m_type==type::SPECIALBLOCK; }
 
-    [[nodiscard]] constexpr bool is_open_tag(const std::u32string_view nam) const noexcept { return m_type==type::OPENTAG && m_value==nam; }
-    [[nodiscard]] constexpr bool is_close_tag(const std::u32string_view nam) const noexcept { return m_type==type::CLOSETAG && m_value==nam; }
+    [[nodiscard]] constexpr bool is_open_tag(const std::u32string_view nam) const noexcept { return m_type==type::OPENTAG and m_value==nam; }
+    [[nodiscard]] constexpr bool is_close_tag(const std::u32string_view nam) const noexcept { return m_type==type::CLOSETAG and m_value==nam; }
+
+    constexpr void set_start_byte_offset(const std::size_t byte_offset) noexcept
+       {
+        m_start_byte_offset = byte_offset;
+       }
 
     [[nodiscard]] constexpr std::u32string const& value() const noexcept { return m_value; }
 
@@ -115,26 +134,31 @@ class ParserEvent final
 
 /////////////////////////////////////////////////////////////////////////////
 template<text::Enc enc>
-class Parser final : public MG::ParserBase<enc>
+class Parser final
 {
  private:
+    MG::ParserBase<enc> m_parser;
     ParserEvent m_event; // Current event
-    bool m_emit_tag_close_event = false; // To signal a deferred tag close
+    bool m_must_emit_tag_close_event = false; // To signal a deferred tag close
 
     class Options final
        {
         private:
-            bool m_enab_cmt_events = false; // Create event on comments
+            bool m_collect_comment_text = false; // Create event on comments
+            bool m_collect_text_sections = false; // Collect text events content
 
         public:
-            [[nodiscard]] constexpr bool is_enable_comment_events() const noexcept { return m_enab_cmt_events; }
-            constexpr void set_enable_comment_events(const bool b =true) noexcept { m_enab_cmt_events = b; }
+            [[nodiscard]] constexpr bool is_collect_comment_text() const noexcept { return m_collect_comment_text; }
+            constexpr void set_collect_comment_text(const bool b =true) noexcept { m_collect_comment_text = b; }
+
+            [[nodiscard]] constexpr bool is_collect_text_sections() const noexcept { return m_collect_text_sections; }
+            constexpr void set_collect_text_sections(const bool b =true) noexcept { m_collect_text_sections = b; }
 
        } m_Options;
 
  public:
-    explicit Parser(const std::string_view bytes) noexcept
-      : MG::ParserBase<enc>(bytes)
+    explicit constexpr Parser(const std::string_view bytes) noexcept
+      : m_parser(bytes)
        {}
 
     [[nodiscard]] constexpr Options const& options() const noexcept { return m_Options; }
@@ -145,42 +169,46 @@ class Parser final : public MG::ParserBase<enc>
 
     [[nodiscard]] constexpr ParserEvent const& next_event()
        {
-        //if( m_emit_tag_close_event )
-        //   {
-        //    m_emit_tag_close_event = false; // eat
-        //    m_event.set_as_close_tag( m_event.value() );
-        //   }
-        //else
-        //   {
-        //    try{
-        //        while( true )
-        //           {
-        //            skip_any_space();
-        //            if( i>=siz )
-        //               {// No more data!
-        //                m_event.set_as_none();
-        //                break;
-        //               }
-        //            else if( eat('<') )
-        //               {
-        //                check_xml_markup();
-        //               }
-        //            else
-        //               {
-        //                m_event.set_as_text( collect_text() );
-        //                break;
-        //               }
-        //           }
-        //       }
-        //    catch(MG::parse_error&)
-        //       {
-        //        throw;
-        //       }
-        //    catch(std::runtime_error& e)
-        //       {
-        //        throw MG::parse_error(e.Message, m_filepath, line, i<=i_last ? i : i_last);
-        //       }
-        //   }
+        if( m_must_emit_tag_close_event )
+           {
+            m_must_emit_tag_close_event = false; // eat
+            m_event.set_as_close_tag( m_event.value() );
+           }
+        else
+           {
+            try{
+                m_parser.skip_any_space();
+                m_event.set_start_byte_offset( m_parser.curr_byte_offset() );
+                if( m_parser.has_codepoint() )
+                   {
+                    if( m_parser.eat(U'<') )
+                       {
+                        parse_xml_markup();
+                       }
+                    else if( options().is_collect_text_sections() )
+                       {
+                        m_event.set_as_text( m_parser.collect_until<U'<'>() );
+                       }
+                    else
+                       {
+                        [[maybe_unused]] const auto text = m_parser.collect_bytes_until<U'<'>();
+                        m_event.set_as_text();
+                       }
+                   }
+                else
+                   {// No more data!
+                    m_event.set_as_none();
+                   }
+               }
+            catch(MG::parse_error&)
+               {
+                throw;
+               }
+            catch(std::runtime_error& e)
+               {
+                throw m_parser.create_parse_error(e.what());
+               }
+           }
 
         return m_event;
        }
@@ -188,204 +216,172 @@ class Parser final : public MG::ParserBase<enc>
 
  private:
 
-/*
-
     //-----------------------------------------------------------------------
-    [[nodiscard]] constexpr bool check_xml_markup()
+    constexpr void parse_xml_markup()
        {
-        if( i>=siz )
+        if( m_parser.eat(U'!') )
            {
-            throw std::runtime_error("Unclosed <");
-           }
-
-        // Could be a tag, comment, special block or processing instruction
-        if( eat('!') )
-           {// Could be a comment or a special block
-            if( i>=siz )
-               {
-                throw std::runtime_error("Unclosed <!");
-               }
-            else if( eat("--") )
-               {// A comment
-                skip_any_space();
-                const std::string_view cmt = collect_until('-','-','>');
-                if( options().is_enable_comment_events() )
+            if( m_parser.eat(U"--") )
+               {// A comment ex. <!-- ... -->
+                if( options().is_collect_comment_text() )
                    {
-                    m_event.set_as_comment( cmt );
-                    break;
-                   }
-               }
-            else if( eat('[') )
-               {// A conditional or <![CDATA[ section
-                if( eat("CDATA[") )
-                   {
-                    skip_any_space();
-                    m_event.set_as_text( collect_until(']',']','>') );
-                    break;
+                    throw std::runtime_error("Collecting comments not yet supported!");
+                    //m_event.set_as_comment( m_parser.collect_until(U"-->") );
                    }
                 else
                    {
+                    [[maybe_unused]] const auto text = m_parser.collect_bytes_until(U"-->");
+                    m_event.set_as_comment();
+                   }
+               }
+            else if( m_parser.eat(U'[') )
+               {
+                if( m_parser.eat(U"CDATA[") )
+                   {// A CDATA section <![CDATA[ ... ]]>
+                    if( options().is_collect_text_sections() )
+                       {
+                        throw std::runtime_error("Collecting text not yet supported!");
+                        //m_event.set_as_text( m_parser.collect_until(U"]]>") );
+                       }
+                    else
+                       {
+                        [[maybe_unused]] const auto text = m_parser.collect_bytes_until(U"]]>");
+                        m_event.set_as_text();
+                       }
+                   }
+                else
+                   {// A conditional section <![CONDITION[ ... ]]>
                     throw std::runtime_error("Conditional sections not yet supported");
                    }
                }
+            else if( not m_parser.has_codepoint() )
+               {
+                throw std::runtime_error("Unclosed <!");
+               }
             else
-               {// A special block: <!DOCTYPE, ...
-                m_event.set_as_special_block( collect_until(']','>') );
-                break;
+               {// A special block: ex. <!DOCTYPE HTML>
+                m_event.set_as_special_block( m_parser.collect_until<U'>'>() );
+                //m_event.set_as_special_block( m_parser.collect_until(U"]>") );
                }
            }
-        else if( eat('?') )
-           {// A processing instruction
-            m_event.set_as_proc_instr( collect_until('?','>') );
-            break;
+        else if( m_parser.eat(U'?') )
+           {// A processing instruction ex. <?xml version="1.0" encoding="utf-8"?>
+            //m_event.set_as_proc_instr( m_parser.collect_until(U"?>") );
+            [[maybe_unused]] const auto text = m_parser.collect_bytes_until(U"]]>");
+            m_event.set_as_proc_instr(U""s);
            }
-        else if( eat('/') )
+        else if( m_parser.eat(U'/') )
            {// A close tag
             m_event.set_as_close_tag( collect_tag_name() );
-            skip_any_space();
-            if( i>=siz || !eat('>') )
+            m_parser.skip_any_space();
+            if( not m_parser.eat(U'>') )
                {
                 throw std::runtime_error("Invalid close tag");
                }
-            break;
            }
         else
            {// A normal markup element (tag)
-            collect_tag( m_event );
-            break;
-           }
-       }
+            m_event.set_as_open_tag( collect_tag_name() );
 
-    //-----------------------------------------------------------------------
-    constexpr void collect_tag(ParserEvent& ev)
-       {
-        const std::size_t line_start = line;
-        const std::size_t i_start = i;
-        ev.set_as_open_tag( collect_tag_name() );
-
-        // Collect attributes
-        auto namval = collect_attribute();
-        while( !namval.first.is_empty() )
-           {
-            if( ev.attributes().contains() )
+            // Collect attributes
+            auto namval = collect_attribute();
+            while( not namval.first.empty() )
                {
-                notify_issue();
-               }
-            ev.attributes().insert_unique(namval.first, namval.second);
-            namval = collect_attribute();
-           }
-
-        // Detect tag close
-        if( i<siz && eat('/') )
-           {
-            m_emit_tag_close_event = true;
-           }
-
-        // Expect >
-        if( i>=siz || !eat('>') )
-           {
-            throw MG::parse_error(fmt::format("Tag {} must be closed with >",std::string(ev.value())), m_filepath, line_start, i_start);
-           }
-       }
-
-    //-----------------------------------------------------------------------
-    [[nodiscard]] constexpr std::string_view collect_tag_name()
-       {
-        skip_any_space();
-        const std::size_t i_start = i;
-        while( i<siz && !is_space() && isnt(U'>') && isnt(U'/') )
-           {
-            if( !is_good_for_tag_name() )
-               {
-                throw std::runtime_error( fmt::format("Character '%c' not allowed in tag name",buf[i]) );
-               }
-            ++i;
-           }
-        return std::string_view(buf+i_start, i-i_start);
-       }
-    [[nodiscard]] constexpr bool is_good_for_tag_name() noexcept
-       {
-        return is_punct() && isnt(U'-') && isnt(U':');
-       }
-
-    //-----------------------------------------------------------------------
-    [[nodiscard]] constexpr std::pair<std::string_view,std::string_view> collect_attribute()
-       {
-        std::pair<std::string_view,std::string_view> namval;
-
-        skip_any_space();
-        if( i<siz )
-           {// Collect attribute name
-            namval.first = buf[i]=='\"' ? collect_inner_same_line('\"','\"','\\')
-                                        : collect_unquoted_attr_name();
-            if( !namval.first.is_empty() )
-               {// Check possible value
-                skip_any_space();
-                if( i<siz )
+                if( m_event.attributes().contains(namval.first) )
                    {
-                    if( eat('=') )
-                       {
-                        skip_any_space();
-                        if( i<siz )
-                           {// Collect attribute value
-                            namval.second = buf[i]=='\"' ? collect_inner_same_line('\"','\"','\\')
-                                                         : collect_unquoted_attr_value();
-                           }
-                        else
-                           {
-                            throw std::runtime_error("Truncated attribute value");
-                           }
-                       }
+                    throw m_parser.create_parse_error( fmt::format("Duplicated attribute {}", text::to_utf8(namval.first)) );
                    }
+                m_event.attributes().append( std::move(namval) );
+                namval = collect_attribute();
+               }
+
+            // Detect tag close
+            if( m_parser.eat(U'/') )
+               {
+                m_must_emit_tag_close_event = true;
+               }
+
+            // Expect >
+            //m_parser.skip_any_space();
+            if( not m_parser.eat(U'>') )
+               {
+                throw m_parser.create_parse_error( fmt::format("Tag {} must be closed with >", text::to_utf8(m_event.value())) );
                }
            }
+       }
+
+    //-----------------------------------------------------------------------
+    [[nodiscard]] constexpr ParserEvent::Attributes::item_type collect_attribute()
+       {
+        ParserEvent::Attributes::item_type namval;
+
+        m_parser.skip_any_space();
+        namval.first = collect_attr_name();
+
+        if( not namval.first.empty() )
+           {// Check possible value
+            m_parser.skip_any_space();
+            if( m_parser.eat(U'=') )
+               {
+                m_parser.skip_any_space();
+                namval.second = m_parser.eat(U'\"') ? collect_quoted_attr_value()
+                                                    : collect_unquoted_attr_value();
+               }
+           }
+
         return namval;
        }
 
     //-----------------------------------------------------------------------
-    [[nodiscard]] constexpr std::string_view collect_unquoted_attr_name()
+    [[nodiscard]] constexpr std::u32string collect_tag_name()
        {
-        assertm( i<siz && !is_space(), "collect_unquoted_attr_name() expects non-space char" );
-        const std::size_t i_start = i;
-        do {
-            if( is(U'=') || is(U'>') || is(U'/') )
-               {
-                break;
-               }
-            else if( is_good_for_attrib_name() )
-               {
-                throw std::runtime_error( fmt::format("Character '%c' not allowed in attribute name",buf[i]) );
-               }
-            ++i;
+        assert( not m_parser.got_space() ); // collect_tag_name() expects non-space char
+        try{
+            return m_parser.collect_until(text::is_space_or_any_of<U'>',U'/'>, text::is_punct_and_not<U'-',U':'>);
            }
-        while( i<siz && !is_space() );
-        return std::string_view(buf+i_start, i-i_start);
-       }
-    [[nodiscard]] constexpr bool is_good_for_attrib_name() noexcept
-       {
-        return is_punct() && isnt(U'-');
+        catch(std::exception& e)
+           {
+            m_parser.create_parse_error( fmt::format("Invalid tag name: {}"sv, e.what()) );
+           }
        }
 
     //-----------------------------------------------------------------------
-    [[nodiscard]] constexpr std::string_view collect_unquoted_attr_value()
+    [[nodiscard]] constexpr std::u32string collect_attr_name()
        {
-        assertm( i<siz && !is_space(), "collect_unquoted_attr_value() expects non-space char" );
-        const std::size_t i_start = i;
-        do {
-            if( is(U'>') || is(U'/') )
-               {
-                break;
-               }
-            else if( is(U'=') || buf[i]=='\"' )
-               {
-                throw std::runtime_error( fmt::format("Character '%c' not allowed in attribute value",buf[i]) );
-               }
-            ++i;
+        assert( not m_parser.got_space() ); // collect_unquoted_attr_name() expects non-space char"
+        try{
+            return m_parser.collect_until(text::is_space_or_any_of<U'=',U'>',U'/'>, text::is_punct_and_not<U'-'>);
            }
-        while( i<siz && !is_space() );
-        return std::string_view(buf+i_start, i-i_start);
+        catch(std::exception& e)
+           {
+            m_parser.create_parse_error( fmt::format("Invalid attribute name: {}"sv, e.what()) );
+           }
        }
-*/
+
+    //-----------------------------------------------------------------------
+    [[nodiscard]] constexpr std::u32string collect_quoted_attr_value()
+       {
+        try{
+            return m_parser.collect_until(text::is<U'\"'>, text::is_endline);
+           }
+        catch(std::exception& e)
+           {
+            throw m_parser.create_parse_error( fmt::format("Invalid attribute quoted value: {}"sv, e.what()) );
+           }
+       }
+
+    //-----------------------------------------------------------------------
+    [[nodiscard]] constexpr std::u32string collect_unquoted_attr_value()
+       {
+        assert( not m_parser.got_space() ); // collect_unquoted_attr_value() expects non-space char"
+        try{
+            return m_parser.collect_until(text::is_space_or_any_of<U'>',U'/'>, text::is_any_of<U'<',U'=',U'\"'>);
+           }
+        catch(std::exception& e)
+           {
+            throw m_parser.create_parse_error( fmt::format("Invalid attribute value: {}"sv, e.what()) );
+           }
+       }
 };
 
 
@@ -428,7 +424,7 @@ static ut::suite<"xml::Parser"> XmlParser_tests = []
     using ut::throws;
 
 
-    ut::test("xml::ParserEvent") = []
+    ut::test("ParserEvent") = []
        {
         xml::ParserEvent event;
 
@@ -440,35 +436,28 @@ static ut::suite<"xml::Parser"> XmlParser_tests = []
         event.set_as_text(U"txt"s);
         expect( that % event.is_text() and event.value()==U"txt"sv ) << "should be a text event\n";
 
-        event.set_as_open_tag(U"otag"s);
-        expect( that % event.is_open_tag(U"otag"sv) ) << "should be an open tag event\n";
+        event.set_as_open_tag(U"open-tag"s);
+        expect( that % event.is_open_tag(U"open-tag"sv) ) << "should be an open tag event\n";
 
-        event.set_as_close_tag(U"ctag"s);
-        expect( that % event.is_close_tag(U"ctag"sv) ) << "should be a close tag event\n";
+        event.set_as_close_tag(U"close-tag"s);
+        expect( that % event.is_close_tag(U"close-tag"sv) ) << "should be a close tag event\n";
 
-        event.set_as_proc_instr(U"proc"s);
-        expect( that % event.is_proc_instr() and event.value()==U"proc"sv ) << "should be a proc-instr event\n";
+        event.set_as_proc_instr(U"proc-instr"s);
+        expect( that % event.is_proc_instr() and event.value()==U"proc-instr"sv ) << "should be a proc-instr event\n";
 
         event.set_as_special_block(U"block"s);
         expect( that % event.is_special_block() and event.value()==U"block"sv ) << "should be a special block event\n";
        };
 
 
-    //auto notify = [](const std::string_view msg) -> void { ut::log << msg; };
-    //ut::test("xml::Parser") = []
-    //   {
-    //    xml::Parser<text::Enc::UTF8> parser{""sv};
-    //   };
 
-/*
-    //-----------------------------------------------------------------------
-    void test_generic(const char* const title)
+    ut::test("generic xml") = []
        {
-        log(fmt::format("  -- {} --",title) );
         const std::string_view buf = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
-                              "<!DOCTYPE doctype [\n"
-                              "<!ELEMENT root (child+)>\n"
-                              "]>\n"
+                              "<!DOCTYPE doctype>"
+                              //"<!DOCTYPE doctype [\n"
+                              //"<!ELEMENT root (child+)>\n"
+                              //"]>\n"
                               "<!-- comment -->\n"
                               "<tag1/><tag2 attr1=\"1\" attr2=2 attr3/>\n"
                               "<tag3>blah</tag3>\n"
@@ -488,47 +477,48 @@ static ut::suite<"xml::Parser"> XmlParser_tests = []
                               "    </child>\n"
                               "</root>\n";
 
-        xml::Parser parser(title, buf, &log);
-        parser.set_fussy();
-        parser.options().set_enable_comment_events();
+        xml::Parser<text::Enc::UTF8> parser{""sv};
+        parser.options().set_collect_comment_text();
+        parser.options().set_collect_text_sections();
 
-        std::size_t k = 0;
+        std::size_t n = 0;
         while( const xml::ParserEvent& event = parser.next_event() )
            {
-            switch( k )
+            switch( n )
                {
-                case  0: TEST_EXPECTM(event.is_proc_instr(), event.string()); break;
-                case  1: TEST_EXPECTM(event.is_special_block(), event.string()); break;
-                case  2: TEST_EXPECTM(event.is_comment(), event.string()); break;
-                case  3: TEST_EXPECTM(event.is_open_tag("tag1") && event.attributes().size()==0, event.string()); break;
-                case  4: TEST_EXPECTM(event.is_close_tag("tag1"), event.string()); break;
-                case  5: TEST_EXPECTM(event.is_open_tag("tag2") && event.attributes().size()==3, event.string()); break;
-                case  6: TEST_EXPECTM(event.is_close_tag("tag2"), event.string()); break;
-                case  7: TEST_EXPECTM(event.is_open_tag("tag3") && event.attributes().size()==0, event.string()); break;
-                case  8: TEST_EXPECTM(event.is_text(), event.string()); break;
-                case  9: TEST_EXPECTM(event.is_close_tag("tag3"), event.string()); break;
-                case 10: TEST_EXPECTM(event.is_open_tag("nms:tag4") && event.attributes().size()==2, event.string()); break;
-                case 11: TEST_EXPECTM(event.is_text(), event.string()); break;
-                case 12: TEST_EXPECTM(event.is_close_tag("nms:tag4"), event.string()); break;
-                case 13: TEST_EXPECTM(event.is_text(), event.string()); break;
-                case 14: TEST_EXPECTM(event.is_text(), event.string()); break;
-                case 15: TEST_EXPECTM(event.is_open_tag("root") && event.attributes().size()==0, event.string()); break;
-                case 16: TEST_EXPECTM(event.is_open_tag("child") && event.attributes().size()==2, event.string()); break;
-                case 17: TEST_EXPECTM(event.is_close_tag("child"), event.string()); break;
-                case 18: TEST_EXPECTM(event.is_open_tag("child") && event.attributes().size()==2, event.string()); break;
-                case 19: TEST_EXPECTM(event.is_text(), event.string()); break;
-                case 20: TEST_EXPECTM(event.is_open_tag("subchild") && event.attributes().size()==0, event.string()); break;
-                case 21: TEST_EXPECTM(event.is_text(), event.string()); break;
-                case 22: TEST_EXPECTM(event.is_close_tag("subchild"), event.string()); break;
-                case 23: TEST_EXPECTM(event.is_close_tag("child"), event.string()); break;
-                case 24: TEST_EXPECTM(event.is_close_tag("root"), event.string()); break;
-
-                default: err("Unexpected event " + event.string());
+                case  0: expect(event.is_proc_instr()) << "got: " << to_string(event) << '\n'; break;
+                case  1: expect(event.is_special_block()) << "got: " << to_string(event) << '\n'; break;
+                case  2: expect(event.is_comment()) << "got: " << to_string(event) << '\n'; break;
+                case  3: expect(event.is_open_tag(U"tag1") and event.attributes().size()==0) << "got: " << to_string(event) << '\n'; break;
+                case  4: expect(event.is_close_tag(U"tag1")) << "got: " << to_string(event) << '\n'; break;
+                case  5: expect(event.is_open_tag(U"tag2") and event.attributes().size()==3) << "got: " << to_string(event) << '\n'; break;
+                case  6: expect(event.is_close_tag(U"tag2")) << "got: " << to_string(event) << '\n'; break;
+                case  7: expect(event.is_open_tag(U"tag3") and event.attributes().size()==0) << "got: " << to_string(event) << '\n'; break;
+                case  8: expect(event.is_text()) << "got: " << to_string(event) << '\n'; break;
+                case  9: expect(event.is_close_tag(U"tag3")) << "got: " << to_string(event) << '\n'; break;
+                case 10: expect(event.is_open_tag(U"nms:tag4") and event.attributes().size()==2) << "got: " << to_string(event) << '\n'; break;
+                case 11: expect(event.is_text()) << "got: " << to_string(event) << '\n'; break;
+                case 12: expect(event.is_close_tag(U"nms:tag4")) << "got: " << to_string(event) << '\n'; break;
+                case 13: expect(event.is_text()) << "got: " << to_string(event) << '\n'; break;
+                case 14: expect(event.is_text()) << "got: " << to_string(event) << '\n'; break;
+                case 15: expect(event.is_open_tag(U"root") and event.attributes().size()==0) << "got: " << to_string(event) << '\n'; break;
+                case 16: expect(event.is_open_tag(U"child") and event.attributes().size()==2) << "got: " << to_string(event) << '\n'; break;
+                case 17: expect(event.is_close_tag(U"child")) << "got: " << to_string(event) << '\n'; break;
+                case 18: expect(event.is_open_tag(U"child") and event.attributes().size()==2) << "got: " << to_string(event) << '\n'; break;
+                case 19: expect(event.is_text()) << "got: " << to_string(event) << '\n'; break;
+                case 20: expect(event.is_open_tag(U"subchild") and event.attributes().size()==0) << "got: " << to_string(event) << '\n'; break;
+                case 21: expect(event.is_text()) << "got: " << to_string(event) << '\n'; break;
+                case 22: expect(event.is_close_tag(U"subchild")) << "got: " << to_string(event) << '\n'; break;
+                case 23: expect(event.is_close_tag(U"child")) << "got: " << to_string(event) << '\n'; break;
+                case 24: expect(event.is_close_tag(U"root")) << "got: " << to_string(event) << '\n'; break;
+                default: expect(false) << "unexpected event: " << to_string(event) << '\n';
                }
-            ++k;
+            ++n;
            }
-        TEST_EXPECT(k==25);
-       }
+        expect( that % n==25 ) << "events number should match";
+       };
+
+/*
 
     //-----------------------------------------------------------------------
     void test_bad(const char* const title)
@@ -581,29 +571,29 @@ static ut::suite<"xml::Parser"> XmlParser_tests = []
            {
             switch( k )
                {
-                case  0: TEST_EXPECTM(event.is_proc_instr(), event.string()); break;
-                case  1: TEST_EXPECTM(event.is_proc_instr(), event.string()); break;
-                case  2: TEST_EXPECTM(event.is_open_tag("interface") && event.attributes().size()==3, event.string()); break;
-                case  3: TEST_EXPECTM(event.is_open_tag("group") && event.attributes().get_value_of("name")=="statistics", event.string()); break;
-                case  4: TEST_EXPECTM(event.is_open_tag("res") && event.attributes().get_value_of("id")=="sheets-done", event.string()); break;
-                case  5: TEST_EXPECTM(event.is_open_tag("text") && event.attributes().get_value_of("lang")=="en", event.string()); break;
-                case  6: TEST_EXPECTM(event.is_text(), event.string()); break;
-                case  7: TEST_EXPECTM(event.is_close_tag("text"), event.string()); break;
-                case  8: TEST_EXPECTM(event.is_open_tag("text") && event.attributes().get_value_of("lang")=="it", event.string()); break;
-                case  9: TEST_EXPECTM(event.is_text(), event.string()); break;
-                case 10: TEST_EXPECTM(event.is_close_tag("text"), event.string()); break;
-                case 11: TEST_EXPECTM(event.is_close_tag("res"), event.string()); break;
-                case 12: TEST_EXPECTM(event.is_open_tag("res") && event.attributes().get_value_of("id")=="buffer-width", event.string()); break;
-                case 13: TEST_EXPECTM(event.is_open_tag("text") && event.attributes().get_value_of("lang")=="en", event.string()); break;
-                case 14: TEST_EXPECTM(event.is_text(), event.string()); break;
-                case 15: TEST_EXPECTM(event.is_close_tag("text"), event.string()); break;
-                case 16: TEST_EXPECTM(event.is_open_tag("text") && event.attributes().get_value_of("lang")=="it", event.string()); break;
-                case 17: TEST_EXPECTM(event.is_text(), event.string()); break;
-                case 18: TEST_EXPECTM(event.is_close_tag("text"), event.string()); break;
-                case 19: TEST_EXPECTM(event.is_close_tag("res"), event.string()); break;
-                case 20: TEST_EXPECTM(event.is_close_tag("group"), event.string()); break;
-                case 21: TEST_EXPECTM(event.is_close_tag("interface"), event.string()); break;
-                default: err("Unexpected event " + event.string());
+                case  0: expect(event.is_proc_instr()) << "got: " << to_string(event) << '\n'; break;
+                case  1: expect(event.is_proc_instr()) << "got: " << to_string(event) << '\n'; break;
+                case  2: expect(event.is_open_tag(U"interface") and event.attributes().size()==3) << "got: " << to_string(event) << '\n'; break;
+                case  3: expect(event.is_open_tag(U"group") and event.attributes().get_value_of("name")=="statistics") << "got: " << to_string(event) << '\n'; break;
+                case  4: expect(event.is_open_tag(U"res") and event.attributes().get_value_of("id")=="sheets-done") << "got: " << to_string(event) << '\n'; break;
+                case  5: expect(event.is_open_tag(U"text") and event.attributes().get_value_of("lang")=="en") << "got: " << to_string(event) << '\n'; break;
+                case  6: expect(event.is_text()) << "got: " << to_string(event) << '\n'; break;
+                case  7: expect(event.is_close_tag(U"text")) << "got: " << to_string(event) << '\n'; break;
+                case  8: expect(event.is_open_tag(U"text") and event.attributes().get_value_of("lang")=="it") << "got: " << to_string(event) << '\n'; break;
+                case  9: expect(event.is_text()) << "got: " << to_string(event) << '\n'; break;
+                case 10: expect(event.is_close_tag(U"text")) << "got: " << to_string(event) << '\n'; break;
+                case 11: expect(event.is_close_tag(U"res")) << "got: " << to_string(event) << '\n'; break;
+                case 12: expect(event.is_open_tag(U"res") and event.attributes().get_value_of("id")=="buffer-width") << "got: " << to_string(event) << '\n'; break;
+                case 13: expect(event.is_open_tag(U"text") and event.attributes().get_value_of("lang")=="en") << "got: " << to_string(event) << '\n'; break;
+                case 14: expect(event.is_text()) << "got: " << to_string(event) << '\n'; break;
+                case 15: expect(event.is_close_tag(U"text")) << "got: " << to_string(event) << '\n'; break;
+                case 16: expect(event.is_open_tag(U"text") and event.attributes().get_value_of("lang")=="it") << "got: " << to_string(event) << '\n'; break;
+                case 17: expect(event.is_text()) << "got: " << to_string(event) << '\n'; break;
+                case 18: expect(event.is_close_tag(U"text")) << "got: " << to_string(event) << '\n'; break;
+                case 19: expect(event.is_close_tag(U"res")) << "got: " << to_string(event) << '\n'; break;
+                case 20: expect(event.is_close_tag(U"group")) << "got: " << to_string(event) << '\n'; break;
+                case 21: expect(event.is_close_tag(U"interface")) << "got: " << to_string(event) << '\n'; break;
+                default: expect(false) << "unexpected event: " << to_string(event) << '\n';
                }
             ++k;
            }

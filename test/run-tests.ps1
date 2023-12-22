@@ -32,6 +32,7 @@ if( $lastexitcode -ne 0 )
     exit 1
    }
 Write-Host ""
+Write-Host "All tests ok" -ForegroundColor Green
 Write-Host "Closing..."
 Start-Sleep -Seconds 3
 exit 0

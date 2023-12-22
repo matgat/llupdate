@@ -556,6 +556,8 @@ constexpr std::string encode_as(const std::string_view in_bytes)
 
     // Predicates
 
+    // Waiting the standard for a better solution...
+
     //-----------------------------------------------------------------------
     [[nodiscard]] constexpr bool is_space(const char32_t cp) noexcept
        {
@@ -581,15 +583,15 @@ constexpr std::string encode_as(const std::string_view in_bytes)
        }
 
     //-----------------------------------------------------------------------
-    [[nodiscard]] constexpr bool is_punct(const char32_t cp) noexcept
-       {
-        return (cp>U' ' and cp<U'0') or (cp>U'9' and cp<U'A') or (cp>U'Z' and cp<U'a') or (cp>U'z' and cp<'\x7F');
-       }
-
-    //-----------------------------------------------------------------------
     [[nodiscard]] constexpr bool is_alpha(const char32_t cp) noexcept
        {
         return (cp>=U'a' and cp<=U'z') or (cp>=U'A' and cp<=U'Z');
+       }
+
+    //-----------------------------------------------------------------------
+    [[nodiscard]] constexpr bool is_punct(const char32_t cp) noexcept
+       {
+        return (cp>U' ' and cp<U'0') or (cp>U'9' and cp<U'A') or (cp>U'Z' and cp<U'a') or (cp>U'z' and cp<'\x7F');
        }
 
     //-----------------------------------------------------------------------
@@ -604,6 +606,20 @@ constexpr std::string encode_as(const std::string_view in_bytes)
     [[nodiscard]] constexpr bool is_any_of(const char32_t cp)
        {
         return ((cp == cps) or ...);
+       }
+
+    //-----------------------------------------------------------------------
+    template<char32_t... cps>
+    [[nodiscard]] constexpr bool is_space_or_any_of(const char32_t cp)
+       {
+        return is_space(cp) or ((cp == cps) or ...);
+       }
+
+    //-----------------------------------------------------------------------
+    template<char32_t... cps>
+    [[nodiscard]] constexpr bool is_punct_and_not(const char32_t cp)
+       {
+        return is_punct(cp) and ((cp != cps) and ...);
        }
 
 }//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -712,20 +728,71 @@ static ut::suite<"text::"> text_tests = []
         expect( buf.has_bytes() and buf.has_codepoint() and buf.byte_pos()==0 and buf.extract_codepoint()==U'a' );
         expect( buf.has_bytes() and buf.has_codepoint() and buf.byte_pos()==2 and buf.extract_codepoint()==U'b' );
         expect( buf.has_bytes() and buf.has_codepoint() and buf.byte_pos()==4 and buf.extract_codepoint()==U'c' );
-        expect( !buf.has_bytes() and !buf.has_codepoint() and buf.byte_pos()==6 );
+        expect( not buf.has_bytes() and not buf.has_codepoint() and buf.byte_pos()==6 );
        };
 
     ut::test("char types") = []
        {
-        expect( that % !text::is_space(U'a')  and !text::is_endline(U'a')  and !text::is_blank(U'a')  and !text::is_digit(U'a')  and  text::is_alpha(U'a') );
-        expect( that % !text::is_space(U'à')  and !text::is_endline(U'à')  and !text::is_blank(U'à')  and !text::is_digit(U'à')  and !text::is_alpha(U'à') );
-        expect( that % !text::is_space(U'2')  and !text::is_endline(U'2')  and !text::is_blank(U'2')  and  text::is_digit(U'2')  and !text::is_alpha(U'2') );
-        expect( that %  text::is_space(U' ')  and !text::is_endline(U' ')  and  text::is_blank(U' ')  and !text::is_digit(U' ')  and !text::is_alpha(U' ') );
-        expect( that %  text::is_space(U'\t') and !text::is_endline(U'\t') and  text::is_blank(U'\t') and !text::is_digit(U'\t') and !text::is_alpha(U'\t') );
-        expect( that %  text::is_space(U'\r') and !text::is_endline(U'\r') and  text::is_blank(U'\r') and !text::is_digit(U'\r') and !text::is_alpha(U'\r') );
-        expect( that %  text::is_space(U'\n') and  text::is_endline(U'\n') and !text::is_blank(U'\n') and !text::is_digit(U'\n') and !text::is_alpha(U'\n') );
-        expect( that % !text::is_space(U'▙')  and !text::is_endline(U'▙')  and !text::is_blank(U'▙')  and !text::is_digit(U'▙')  and !text::is_alpha(U'▙') );
-        expect( that % !text::is_space(U'❸') and !text::is_endline(U'❸') and !text::is_blank(U'❸') and !text::is_digit(U'❸') and !text::is_alpha(U'❸') );
+        expect( that % !text::is_space(U'a') );
+        expect( that % !text::is_blank(U'a') );
+        expect( that % !text::is_endline(U'a') );
+        expect( that % !text::is_digit(U'a') );
+        expect( that % text::is_alpha(U'a') );
+        expect( that % !text::is_punct(U'a') );
+
+        expect( that % !text::is_space(U'à') );
+        expect( that % !text::is_blank(U'à') );
+        expect( that % !text::is_endline(U'à') );
+        expect( that % !text::is_digit(U'à') );
+        expect( that % !text::is_alpha(U'à') );
+        expect( that % !text::is_punct(U'à') );
+
+        expect( that % !text::is_space(U'2') );
+        expect( that % !text::is_blank(U'2') );
+        expect( that % !text::is_endline(U'2') );
+        expect( that % text::is_digit(U'2') );
+        expect( that % !text::is_alpha(U'2') );
+        expect( that % !text::is_punct(U'2') );
+
+        expect( that % text::is_space(U' ') );
+        expect( that % text::is_blank(U' ') );
+        expect( that % !text::is_endline(U' ') );
+        expect( that % !text::is_digit(U' ') );
+        expect( that % !text::is_alpha(U' ') );
+        expect( that % !text::is_punct(U' ') );
+
+        expect( that % text::is_space(U'\r') );
+        expect( that % text::is_blank(U'\r') );
+        expect( that % !text::is_endline(U'\r') );
+        expect( that % !text::is_digit(U'\r') );
+        expect( that % !text::is_alpha(U'\r') );
+        expect( that % !text::is_punct(U'\r') );
+
+        expect( that % text::is_space(U'\n') );
+        expect( that % !text::is_blank(U'\n') );
+        expect( that % text::is_endline(U'\n') );
+        expect( that % !text::is_digit(U'\n') );
+        expect( that % !text::is_alpha(U'\n') );
+        expect( that % !text::is_punct(U'\n') );
+
+        expect( that % !text::is_space(U'▙') );
+        expect( that % !text::is_blank(U'▙') );
+        expect( that % !text::is_endline(U'▙') );
+        expect( that % !text::is_digit(U'▙') );
+        expect( that % !text::is_alpha(U'▙') );
+        expect( that % !text::is_punct(U'▙') );
+
+        expect( that % !text::is_space(U'❸') );
+        expect( that % !text::is_blank(U'❸') );
+        expect( that % !text::is_endline(U'❸') );
+        expect( that % !text::is_digit(U'❸') );
+        expect( that % !text::is_alpha(U'❸') );
+        expect( that % !text::is_punct(U'❸') );
+
+        expect( text::is<U'♦'>(U'♦') and not text::is<U'♥'>(U'♦') );
+        expect( text::is_any_of<U'♥',U'♦',U'♠',U'♣'>(U'♣') and not text::is_any_of<U'♥',U'♦',U'♠',U'♣'>(U'☺') );
+        expect( text::is_space_or_any_of<U'a',U'b'>(U'a') and text::is_space_or_any_of<U'a',U'b'>(U' ') and not text::is_space_or_any_of<U'a',U'b'>(U'c') );
+        expect( text::is_punct_and_not<U'-'>(U';') and not text::is_punct_and_not<U'-'>(U'a') and not text::is_punct_and_not<U'-'>(U'-') );
        };
 
     ut::test("text::encode_as") = []
