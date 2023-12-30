@@ -18,17 +18,17 @@ namespace text
         //-------------------------------------------------------------------
         [[nodiscard]] constexpr std::uint16_t combine_chars(const char h, const char l) noexcept
            {
-            return (static_cast<unsigned char>(h) << 0x8) |
-                    static_cast<unsigned char>(l);
+            return static_cast<std::uint16_t>(static_cast<unsigned char>(h) << 0x8) |
+                   static_cast<std::uint16_t>(static_cast<unsigned char>(l));
            }
 
         //-------------------------------------------------------------------
         [[nodiscard]] constexpr std::uint32_t combine_chars(const char hh, const char hl, const char lh, const char ll) noexcept
            {
-            return (static_cast<unsigned char>(hh) << 0x18) |
-                   (static_cast<unsigned char>(hl) << 0x10) |
-                   (static_cast<unsigned char>(lh) << 0x8) |
-                    static_cast<unsigned char>(ll);
+            return static_cast<std::uint32_t>(static_cast<unsigned char>(hh) << 0x18) |
+                   static_cast<std::uint32_t>(static_cast<unsigned char>(hl) << 0x10) |
+                   static_cast<std::uint32_t>(static_cast<unsigned char>(lh) << 0x8) |
+                   static_cast<std::uint32_t>(static_cast<unsigned char>(ll));
            }
 
         //-------------------------------------------------------------------
@@ -146,28 +146,34 @@ template<> constexpr char32_t extract_codepoint<Enc::UTF8>(const std::string_vie
 
     if( (bytes[pos] & 0x80)==0 ) [[likely]]
        {
-        const char32_t codepoint = bytes[pos];
+        const char32_t codepoint = static_cast<char32_t>(bytes[pos]);
         ++pos;
         return codepoint;
        }
 
     else if( (pos+1)<bytes.size() && (bytes[pos] & 0xE0)==0xC0 && (bytes[pos+1] & 0xC0)==0x80 )
        {
-        const char32_t codepoint = ((bytes[pos] & 0x1F) << 6) | (bytes[pos+1] & 0x3F);
+        const char32_t codepoint = static_cast<char32_t>((bytes[pos] & 0x1F) << 6) |
+                                   static_cast<char32_t>(bytes[pos+1] & 0x3F);
         pos += 2;
         return codepoint;
        }
 
     else if( (pos+2)<bytes.size() && (bytes[pos] & 0xF0)==0xE0 && (bytes[pos+1] & 0xC0)==0x80 && (bytes[pos+2] & 0xC0)==0x80 )
        {
-        const char32_t codepoint = ((bytes[pos] & 0x0F) << 12) | ((bytes[pos+1] & 0x3F) << 6) | (bytes[pos+2] & 0x3F);
+        const char32_t codepoint = static_cast<char32_t>((bytes[pos] & 0x0F) << 12) |
+                                   static_cast<char32_t>((bytes[pos+1] & 0x3F) << 6) |
+                                   static_cast<char32_t>(bytes[pos+2] & 0x3F);
         pos += 3;
         return codepoint;
        }
 
     else if( (pos+3)<bytes.size() && (bytes[pos] & 0xF8)==0xF0 && (bytes[pos+1] & 0xC0)==0x80 && (bytes[pos+2] & 0xC0)==0x80 && (bytes[pos+3] & 0xC0)==0x80 )
        {
-        const char32_t codepoint = ((bytes[pos] & 0x07) << 18) | ((bytes[pos+1] & 0x3F) << 12) | ((bytes[pos+2] & 0x3F) << 6) | (bytes[pos+3] & 0x3F);
+        const char32_t codepoint = static_cast<char32_t>((bytes[pos] & 0x07) << 18) |
+                                   static_cast<char32_t>((bytes[pos+1] & 0x3F) << 12) |
+                                   static_cast<char32_t>((bytes[pos+2] & 0x3F) << 6) |
+                                   static_cast<char32_t>(bytes[pos+3] & 0x3F);
         pos += 4;
         return codepoint;
        }
@@ -218,7 +224,7 @@ template<bool LE> constexpr char32_t extract_next_codepoint_from_utf16(const std
 
     // Ok, I have the two valid codeunits
     pos += 2;
-    return 0x10000 + ((codeunit1 - 0xD800) << 0xA) + (codeunit2 - 0xDC00);
+    return 0x10000 + static_cast<char32_t>((codeunit1 - 0xD800) << 0xA) + (codeunit2 - 0xDC00);
 }
 template<> constexpr char32_t extract_codepoint<Enc::UTF16LE>(const std::string_view bytes, std::size_t& pos) noexcept
 {
@@ -382,15 +388,20 @@ template<Enc ENC> class buffer_t final
       : m_byte_buf(bytes)
        {}
 
-    [[nodiscard]] constexpr std::string_view get_slice_between(const std::size_t from_byte_pos, const std::size_t to_byte_pos) const noexcept
+    [[nodiscard]] constexpr std::string_view get_current_view() const noexcept
        {
-        assert( to_byte_pos>=from_byte_pos and to_byte_pos<=m_byte_buf.size() );
-        return std::string_view(m_byte_buf.data()+from_byte_pos, to_byte_pos-from_byte_pos);
+        return m_byte_buf.substr(m_current_byte_offset);
+       }
+
+    [[nodiscard]] constexpr std::string_view get_view_between(const std::size_t from_byte_pos, const std::size_t to_byte_pos) const noexcept
+       {
+        assert( from_byte_pos<=to_byte_pos and to_byte_pos<=m_byte_buf.size() );
+        return m_byte_buf.substr(from_byte_pos, to_byte_pos-from_byte_pos);
        }
 
     [[nodiscard]] constexpr std::size_t byte_pos() const noexcept { return m_current_byte_offset; }
-
-    void set_as_depleted() noexcept { m_current_byte_offset = m_byte_buf.size(); }
+    constexpr void advance_of(const std::size_t bytes_num) noexcept { m_current_byte_offset += bytes_num; }
+    constexpr void set_as_depleted() noexcept { m_current_byte_offset = m_byte_buf.size(); }
 
     [[nodiscard]] constexpr bool has_bytes() const noexcept
        {
@@ -432,6 +443,7 @@ constexpr std::string re_encode(const std::string_view in_bytes)
 {
     std::string out_bytes;
 
+    // utf-32 occupa in genere più bytes
     using enum text::Enc;
     if constexpr( INENC==UTF8 and (OUTENC==UTF32BE or OUTENC==UTF32LE) )
        {
@@ -450,14 +462,14 @@ constexpr std::string re_encode(const std::string_view in_bytes)
         out_bytes.reserve( in_bytes.size() );
        }
 
-    text::buffer_t<INENC> text_buf(in_bytes);
-    while( text_buf.has_codepoint() )
+    text::buffer_t<INENC> bytes_buf(in_bytes);
+    while( bytes_buf.has_codepoint() )
        {
-        append_codepoint<OUTENC>(text_buf.extract_codepoint(), out_bytes);
+        append_codepoint<OUTENC>(bytes_buf.extract_codepoint(), out_bytes);
        }
 
     // Detect truncated
-    if( text_buf.has_bytes() )
+    if( bytes_buf.has_bytes() )
        {// Truncated codepoint!
         append_codepoint<OUTENC>(err_codepoint, out_bytes);
        }
@@ -512,49 +524,86 @@ constexpr std::string encode_as(const std::string_view in_bytes)
 
 
 //-----------------------------------------------------------------------
-[[nodiscard]] constexpr std::string to_utf8(const std::u32string_view u32str)
-{
-    std::string utf8str;
-    // In the worst case scenario I need four bytes for each codepoint
-    utf8str.reserve( 4 * u32str.size() );
-
-    for( const char32_t codepoint : u32str )
-       {
-        append_codepoint<Enc::UTF8>(codepoint, utf8str);
-       }
-
-    return utf8str;
-}
-[[nodiscard]] constexpr std::string to_utf8(const char32_t codepoint)
-{
-    std::string utf8str;
-    append_codepoint<Enc::UTF8>(codepoint, utf8str);
-    return utf8str;
-}
-
-
-//-----------------------------------------------------------------------
-[[nodiscard]] constexpr std::u32string to_utf32(const std::string_view utf8str)
+template<text::Enc INENC>
+[[nodiscard]] constexpr std::u32string to_utf32(const std::string_view bytes)
 {
     std::u32string u32str;
-    u32str.reserve( utf8str.size() );
+    u32str.reserve( bytes.size() );
 
-    text::buffer_t<Enc::UTF8> text_buf(utf8str);
-    while( text_buf.has_codepoint() )
+    text::buffer_t<INENC> bytes_buf(bytes);
+    while( bytes_buf.has_codepoint() )
        {
-        u32str.push_back( text_buf.extract_codepoint() );
+        u32str.push_back( bytes_buf.extract_codepoint() );
+       }
+
+    // Detect truncated
+    if( bytes_buf.has_bytes() )
+       {// Truncated codepoint!
+        u32str.push_back(err_codepoint);
        }
 
     return u32str;
 }
+
 [[nodiscard]] /*constexpr*/ std::u32string to_utf32(const std::u8string_view utf8str)
 {
-    return to_utf32( std::string_view(reinterpret_cast<const char*>(utf8str.data()), utf8str.size()) );
+    return to_utf32<text::Enc::UTF8>( std::string_view(reinterpret_cast<const char*>(utf8str.data()), utf8str.size()) );
+}
+
+
+//---------------------------------------------------------------------------
+// Encode a char32_t sequence to OUTENC
+// const std::string out_bytes = text::to<UTF16LE>(U"abc");
+//-----------------------------------------------------------------------
+//concept char32_sequence = requires (T sequence)
+//   {
+//    { sequence[std::declval<std::size_t>()] } -> std::same_as<char32_t&>;
+//    { sequence.size() } -> std::same_as<std::size_t>;
+//   };
+//template<char32_sequence u32sq>
+template<text::Enc OUTENC>
+constexpr std::string to(const std::u32string_view u32str)
+{
+    std::string out_bytes;
+
+    // Assuming the worst case: four bytes per codepoint
+    out_bytes.reserve( 4 * u32str.size() );
+
+    for( const char32_t codepoint : u32str )
+       {
+        append_codepoint<OUTENC>(codepoint, out_bytes);
+       }
+
+    return out_bytes;
+}
+//-----------------------------------------------------------------------
+template<text::Enc OUTENC>
+[[nodiscard]] constexpr std::string to(const char32_t codepoint)
+{
+    std::string out_bytes;
+    out_bytes.reserve( 4 );
+    append_codepoint<OUTENC>(codepoint, out_bytes);
+    return out_bytes;
+}
+
+
+//-----------------------------------------------------------------------
+[[nodiscard]] constexpr std::string to_utf8(const std::u32string_view u32str)
+{
+    return to<Enc::UTF8>(u32str);
+}
+//-----------------------------------------------------------------------
+[[nodiscard]] constexpr std::string to_utf8(const char32_t codepoint)
+{
+    return to<Enc::UTF8>(codepoint);
 }
 
 
 
+
     // Predicates
+    // std::predicate<const char32_t>
+    [[nodiscard]] constexpr bool is_always_false(const char32_t) noexcept { return false; }
 
     // Waiting the standard for a better solution...
 
@@ -637,6 +686,43 @@ static ut::suite<"text::"> text_tests = []
     using ut::that;
     using namespace std::literals; // "..."sv
     using enum text::Enc;
+
+
+    ut::test("bitwise utilities") = []
+       {
+        using namespace text::details;
+
+        const char OxCA = '\xCA';
+        const char OxFE = '\xFE';
+        const std::uint16_t OxCAFE = 0xCAFE;
+
+        expect( that % combine_chars(OxCA,OxFE) == OxCAFE );
+        expect( that % high_byte_of(OxCAFE) == OxCA );
+        expect( that % low_byte_of(OxCAFE) == OxFE );
+
+        expect( that % combine_chars('\x01','\x02') == 0x0102 );
+        expect( that % high_byte_of(0x0102) == '\x01' );
+        expect( that % low_byte_of(0x0102) == '\x02' );
+
+        const char OxFA = '\xFA';
+        const char OxDE = '\xDE';
+        const char OxBA = '\xBA';
+        const char OxDA = '\xDA';
+        const std::uint32_t OxFADEBADA = 0xFADEBADA;
+
+        expect( that % combine_chars(OxFA,OxDE,OxBA,OxDA) == OxFADEBADA );
+        expect( that % hh_byte_of(OxFADEBADA) == OxFA );
+        expect( that % hl_byte_of(OxFADEBADA) == OxDE );
+        expect( that % lh_byte_of(OxFADEBADA) == OxBA );
+        expect( that % ll_byte_of(OxFADEBADA) == OxDA );
+
+        expect( that % combine_chars('\x01','\x02','\x03','\x04') == 0x01020304u );
+        expect( that % hh_byte_of(0x01020304) == '\x01' );
+        expect( that % hl_byte_of(0x01020304) == '\x02' );
+        expect( that % lh_byte_of(0x01020304) == '\x03' );
+        expect( that % ll_byte_of(0x01020304) == '\x04' );
+       };
+
 
     ut::test("detect_encoding_of") = []
        {

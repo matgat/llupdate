@@ -28,12 +28,13 @@ long_line_behaviour=1
 long_line_column=72
 
 [files]
-current_page=1
-FILE_NAME_0=622;C++;0;EUTF-8;0;1;0;%2Fhome%2Fmat%2Fdev%2Fllupdate%2Ftest%2Ftest.cpp;0;4
-FILE_NAME_1=6109;C++;0;EUTF-8;0;1;0;%2Fhome%2Fmat%2Fdev%2Fllupdate%2Fsource%2Fparser-xml.hpp;0;4
+current_page=2
+FILE_NAME_0=369;C++;0;EUTF-8;0;1;0;%2Fhome%2Fmat%2Fdev%2Fllupdate%2Ftest%2Ftest.cpp;0;4
+FILE_NAME_1=5321;C++;0;EUTF-8;0;1;0;%2Fhome%2Fmat%2Fdev%2Fllupdate%2Fsource%2Fparser-xml.hpp;0;4
+FILE_NAME_2=9394;C++;0;EUTF-8;0;1;0;%2Fhome%2Fmat%2Fdev%2Fllupdate%2Fsource%2Fparser-base.hpp;0;4
 
 [VTE]
-last_dir=/home/mat/dev/llupdate/source
+last_dir=/home/mat/dev/llupdate
 
 [build-menu]
 filetypes=C++;
@@ -47,7 +48,7 @@ NF_02_LB=git pull
 NF_02_CM=git pull
 NF_02_WD=%p
 EX_00_LB=Run tests
-EX_00_CM=g++ -std=c++2b -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wfatal-errors -O3 -lfmt -Isource -o "linux/build/llupdate-test" "test/test.cpp" && "linux/build/llupdate-test"
+EX_00_CM=clang++ -std=c++2b -g -Og -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wfatal-errors -lfmt -Isource -o "linux/build/llupdate-test" "test/test.cpp" && "linux/build/llupdate-test"
 EX_00_WD=%p
 EX_01_LB=Run
 EX_01_CM=./llupdate -h
