@@ -7,7 +7,7 @@ namespace ut = boost::ut;
 #include "string_map.hpp" // MG::string_map<>
 #include "text.hpp" // text::*
 #include "parser-base.hpp" // MG::ParserBase
-//#include "parser-xml.hpp" // xml::Parser
+#include "parser-xml.hpp" // xml::Parser
 //#include "project-updater.hpp" // ll::update_project()
 
 

@@ -231,22 +231,25 @@ template<typename TVAL>
    {
     std::string s;
     auto it = strmap.begin();
-    s += it->first;
-    s += '=';
-    if constexpr(std::same_as<TVAL, std::string>)
-        s += it->second;
-    else
-        s += std::to_string(it->second);
-    
-    while( ++it!=strmap.end() )
+    if( it!=strmap.end() )
        {
-        s += ',';
         s += it->first;
         s += '=';
         if constexpr(std::same_as<TVAL, std::string>)
             s += it->second;
         else
             s += std::to_string(it->second);
+
+        while( ++it!=strmap.end() )
+           {
+            s += ',';
+            s += it->first;
+            s += '=';
+            if constexpr(std::same_as<TVAL, std::string>)
+                s += it->second;
+            else
+                s += std::to_string(it->second);
+           }
        }
     return s;
    }

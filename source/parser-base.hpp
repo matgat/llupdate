@@ -313,13 +313,13 @@ class ParserBase final
         static constexpr end_block_arr_t end_block_arr{end_seq1, end_seq2, end_seqtail...};
         constexpr std::u32string_view end_block(end_block_arr.data(), end_block_arr.size());
         using preceding_match_t = std::array<bool, end_block_arr.size()-1u>;
-        static constexpr preceding_match_t preceding_match = [](const end_block_arr_t& end_block_arr) constexpr
+        static constexpr preceding_match_t preceding_match = [](const end_block_arr_t& end_blk) constexpr
            {
             preceding_match_t a;
             a[0] = true;
             for(std::size_t i=1; i<a.size(); ++i)
                {
-                a[i] = a[i-1] && end_block_arr[i-1]==end_block_arr[i];
+                a[i] = a[i-1] && end_blk[i-1]==end_blk[i];
                }
             return a;
            }(end_block_arr);

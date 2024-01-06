@@ -29,12 +29,12 @@ long_line_column=72
 
 [files]
 current_page=2
-FILE_NAME_0=369;C++;0;EUTF-8;0;1;0;%2Fhome%2Fmat%2Fdev%2Fllupdate%2Ftest%2Ftest.cpp;0;4
-FILE_NAME_1=5321;C++;0;EUTF-8;0;1;0;%2Fhome%2Fmat%2Fdev%2Fllupdate%2Fsource%2Fparser-xml.hpp;0;4
-FILE_NAME_2=9394;C++;0;EUTF-8;0;1;0;%2Fhome%2Fmat%2Fdev%2Fllupdate%2Fsource%2Fparser-base.hpp;0;4
+FILE_NAME_0=367;C++;0;EUTF-8;0;1;0;%2Fhome%2Fmat%2Fdev%2Fllupdate%2Ftest%2Ftest.cpp;0;4
+FILE_NAME_1=4285;C++;0;EUTF-8;0;1;0;%2Fhome%2Fmat%2Fdev%2Fllupdate%2Fsource%2Fparser-xml.hpp;0;4
+FILE_NAME_2=1862;C++;0;EUTF-8;0;1;0;%2Fhome%2Fmat%2Fdev%2Fllupdate%2Fsource%2Fproject-updater.hpp;0;4
 
 [VTE]
-last_dir=/home/mat/dev/llupdate
+last_dir=/home/mat/dev/llupdate/linux/build
 
 [build-menu]
 filetypes=C++;
@@ -51,7 +51,7 @@ EX_00_LB=Run tests
 EX_00_CM=clang++ -std=c++2b -g -Og -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wfatal-errors -lfmt -Isource -o "linux/build/llupdate-test" "test/test.cpp" && "linux/build/llupdate-test"
 EX_00_WD=%p
 EX_01_LB=Run
-EX_01_CM=./llupdate -h
+EX_01_CM=./llupdate -v ../../test/LogicLab.ppjs
 EX_01_WD=%p/linux/build
 C++FT_00_LB=_Compile
 C++FT_00_CM=g++ -fanalyzer -std=c++2b -fsyntax-only -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wfatal-errors -c "%f"
@@ -68,6 +68,9 @@ C++FT_03_WD=%p
 C++FT_04_LB=Build with clang
 C++FT_04_CM=clang++ -std=c++2b -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wfatal-errors -O3 -flto=auto -lfmt -o "linux/build/llupdate" "source/main.cpp"
 C++FT_04_WD=%p
+EX_02_LB=
+EX_02_CM=
+EX_02_WD=
 
 [prjorg]
 source_patterns=*.c;*.C;*.cpp;*.cxx;*.c++;*.cc;*.m;

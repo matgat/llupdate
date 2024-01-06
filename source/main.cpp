@@ -188,15 +188,15 @@ int main( const int argc, const char* const argv[] )
         Arguments::print_usage();
        }
 
-    //catch( parse_error& e)
-    //   {
-    //    fmt::print("!! {} ({}:{})\n", e.what(), args.prj_path().filename().string(), e.line());
-    //    sys::edit_text_file( args.prj_path().string(), e.line() );
-    //   }
+    catch( text::parse_error& e)
+       {
+        fmt::print("!! {} (line {})\n", e.what(), e.line());
+        //sys::edit_text_file( args.prj_path().string(), e.line() );
+       }
 
     catch( std::exception& e )
        {
-        fmt::print("!! Error: {}\n", e.what());
+        fmt::print("!! {}\n", e.what());
        }
 
     return 2;
